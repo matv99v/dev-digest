@@ -2,10 +2,12 @@
 
 ## Source of truth
 
-Read this folder's `docs/`, `specs/`, `INSIGHTS.md`, then `README.md`, before the
-code. Repo-wide rules live in the root `CLAUDE.md`.
+Read this folder's `docs/`, then `README.md`, before the code. Repo-wide rules
+live in the root `CLAUDE.md`.
 
 ## Read when
+
+**When a trigger applies, read its document before acting** — never up front.
 
 | Trigger | Read |
 |---|---|

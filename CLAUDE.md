@@ -21,6 +21,13 @@ disagree the doc is stale, so fix it in the same change.
 | Working inside a package | that package's own `CLAUDE.md` — `server/`, `client/`, `reviewer-core/`, `e2e/` |
 | Authoring or editing an agent's system prompt | `docs/agent-prompts/README.md` |
 
+## Insights loop
+
+`INSIGHTS.md` is written, not just read. The `engineering-insights` skill appends
+to the touched module's file whenever work surfaces something a careful reader
+could not have predicted — append-only; never rewrite an entry. Review new entries
+at commit time: a wrong one propagates into every later session until corrected.
+
 ## Conventions
 
 - **Package managers differ per package.** `server/`+`client/` use pnpm,

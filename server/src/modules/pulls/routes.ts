@@ -7,7 +7,7 @@ import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, sumCostByPr } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -129,21 +129,19 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
-    // Latest COMPLETED run's cost per PR for the list's COST column. Cost lives
-    // on agent_runs (not reviews), so it needs its own pass — same shape as the
-    // score lookup above: one IN-query, newest-first, first-seen-per-PR wins.
-    // Only 'done' runs count: a failed run has no cost data, and letting it win
-    // would blank the column for a PR that HAS been reviewed.
-    const latestCostByPr = new Map<string, number | null>();
+    // TOTAL cost per PR for the list's COST column. Cost lives on agent_runs
+    // (not reviews), so it needs its own pass. Unlike the score above — which is
+    // deliberately the LATEST review's — this is summed across every completed
+    // run, because the question a cost column answers is "what has this PR cost
+    // me", and a PR is normally reviewed many times. Ordering is irrelevant to a
+    // sum, so unlike the score query this one doesn't need an ORDER BY.
+    let totalCostByPr = new Map<string, number>();
     if (prIds.length > 0) {
       const runRows = await container.db
         .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
         .from(t.agentRuns)
-        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')))
-        .orderBy(desc(t.agentRuns.ranAt));
-      for (const run of runRows) {
-        if (run.prId && !latestCostByPr.has(run.prId)) latestCostByPr.set(run.prId, run.costUsd);
-      }
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
+      totalCostByPr = sumCostByPr(runRows);
     }
 
     const now = Date.now();
@@ -170,7 +168,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
-        cost_usd: latestCostByPr.get(r.id) ?? null,
+        cost_usd: totalCostByPr.get(r.id) ?? null,
       };
     });
   });

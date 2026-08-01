@@ -8,15 +8,15 @@ import { useTranslations } from "next-intl";
 import { formatCost, formatTokenCount } from "./helpers";
 
 /**
- * `compact`  — "$0.014". Cost alone, for dense contexts: the PR list's COST
+ * `compact`  — "$0.0048". Cost alone, for dense contexts: the PR list's COST
  *              column and the trace drawer's COST stat tile.
  * `detailed` — "9,119 tok · $0.0013". Usage plus cost, for the PR-detail
  *              timeline where there's room and the token count is the point.
+ *
+ * Both render cost at the same precision (COST_DECIMALS) — the variants differ
+ * only in whether usage is shown, never in how exact the money looks.
  */
 export type RunCostVariant = "compact" | "detailed";
-
-/** Per-variant decimal places — see formatCost for why they differ. */
-const DECIMALS: Record<RunCostVariant, number> = { compact: 3, detailed: 4 };
 
 const baseStyle: React.CSSProperties = {
   color: "var(--text-muted)",
@@ -38,7 +38,7 @@ export function RunCostBadge({
   style?: React.CSSProperties;
 }) {
   const t = useTranslations("common");
-  const cost = formatCost(costUsd, DECIMALS[variant]);
+  const cost = formatCost(costUsd);
   const tokens = variant === "detailed" ? formatTokenCount(tokensIn, tokensOut) : null;
 
   // With no usage recorded either, the detailed variant collapses to the same

@@ -4,21 +4,30 @@
 export const NO_DATA = "—";
 
 /**
- * USD for one run.
+ * Decimal places for every cost figure in the studio.
  *
- * The central rule of this feature: a run with NO cost data reads "—", never
- * "$0.00". A failed run, an unpriced model, and a run recorded before cost
- * tracking existed are all "we don't know" — showing $0.00 would claim the run
- * was free, which is a different (and wrong) statement.
- *
- * A genuine 0 is still printed as $0.000, so the two stay distinguishable.
- *
- * `decimals` differs per variant because the magnitudes differ: the PR list
- * aggregates to cents (`$0.014`), a single timeline run is often a tenth of a
- * cent (`$0.0013`). Below the smallest representable value we print `<$0.001`
- * rather than a rounded-to-nothing "$0.000".
+ * Four, not two or three, because a single review on a cheap model genuinely
+ * costs ~$0.0006: at 3 decimals that rounds away to the `<$0.001` floor, which
+ * tells the reader nothing and — worse — made the PR list LESS precise than the
+ * run timeline showing the very same number. One shared precision keeps the
+ * list, the timeline, and the trace tile agreeing.
  */
-export function formatCost(usd: number | null | undefined, decimals = 3): string {
+export const COST_DECIMALS = 4;
+
+/**
+ * USD, for one run or for a PR's total.
+ *
+ * The central rule of this feature: NO cost data reads "—", never "$0.00". A
+ * failed run, an unpriced model, and a run recorded before cost tracking
+ * existed are all "we don't know" — showing $0.00 would claim it was free,
+ * which is a different (and wrong) statement.
+ *
+ * A genuine 0 is still printed as $0.0000, so the two stay distinguishable.
+ *
+ * Below the smallest representable value we print `<$0.0001` rather than a
+ * rounded-to-nothing "$0.0000".
+ */
+export function formatCost(usd: number | null | undefined, decimals = COST_DECIMALS): string {
   if (usd == null || !Number.isFinite(usd)) return NO_DATA;
   if (usd === 0) return `$${usd.toFixed(decimals)}`;
   const smallest = 10 ** -decimals;

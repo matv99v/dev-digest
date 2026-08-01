@@ -21,9 +21,24 @@ function renderBadge(props: React.ComponentProps<typeof RunCostBadge>) {
 }
 
 describe("RunCostBadge — variants", () => {
-  it("compact shows cost alone, at cent precision", () => {
+  it("compact shows cost alone", () => {
     renderBadge({ costUsd: 0.0141 });
-    expect(screen.getByText("$0.014")).toBeInTheDocument();
+    expect(screen.getByText("$0.0141")).toBeInTheDocument();
+  });
+
+  // Regression: at 3 decimals this rendered "<$0.001", making the PR list less
+  // precise than the timeline showing the same run, for a wholly ordinary cost.
+  it("shows a sub-tenth-of-a-cent total exactly, not as a floor marker", () => {
+    renderBadge({ costUsd: 0.0006 });
+    expect(screen.getByText("$0.0006")).toBeInTheDocument();
+    expect(screen.queryByText(/^</)).not.toBeInTheDocument();
+  });
+
+  it("renders both variants at the same cost precision", () => {
+    renderBadge({ costUsd: 0.0006 });
+    renderBadge({ variant: "detailed", costUsd: 0.0006, tokensIn: 3831, tokensOut: 0 });
+    expect(screen.getByText("$0.0006")).toBeInTheDocument();
+    expect(screen.getByText("3,831 tok · $0.0006")).toBeInTheDocument();
   });
 
   it("detailed shows summed tokens then cost, at finer precision", () => {
@@ -48,14 +63,14 @@ describe("RunCostBadge — unknown cost is never $0.00", () => {
 
   it("a genuine zero still prints as a number, so it stays distinguishable", () => {
     renderBadge({ costUsd: 0 });
-    expect(screen.getByText("$0.000")).toBeInTheDocument();
+    expect(screen.getByText("$0.0000")).toBeInTheDocument();
   });
 });
 
 describe("formatCost", () => {
-  it("floors at the smallest representable value rather than rounding to $0.000", () => {
-    expect(formatCost(0.0004)).toBe("<$0.001");
-    expect(formatCost(0.0004, 4)).toBe("$0.0004");
+  it("floors only below the smallest representable value, never rounding to $0.0000", () => {
+    expect(formatCost(0.0006)).toBe("$0.0006");
+    expect(formatCost(0.00004)).toBe("<$0.0001");
   });
 
   it("treats non-finite values as unknown", () => {

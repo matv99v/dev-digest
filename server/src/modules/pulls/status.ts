@@ -31,6 +31,27 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
 }
 
 /**
+ * Total review spend per PR for the list's COST column — the sum of EVERY
+ * completed run, not just the newest one. A PR is typically reviewed several
+ * times (re-runs, multiple agents), so "what has reviewing this PR cost me"
+ * is the only reading of a single cost figure that isn't misleading: showing
+ * one run's cost under-reports a 7-run PR by roughly 7×.
+ *
+ * Runs with an unknown cost (unpriced model, or recorded before cost tracking)
+ * are SKIPPED, not treated as poisoning the total — one unknown run must not
+ * blank a PR that has demonstrably cost money. A PR with no priced run at all
+ * is simply absent from the map, so the caller renders "—" rather than $0.00.
+ */
+export function sumCostByPr(rows: { prId: string | null; costUsd: number | null }[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.prId || row.costUsd == null) continue;
+    totals.set(row.prId, (totals.get(row.prId) ?? 0) + row.costUsd);
+  }
+  return totals;
+}
+
+/**
  * Review-freshness status for the PR list. Merged/closed PRs keep their GitHub
  * merge state; open PRs map to:
  *  - `needs_review` — never reviewed, OR head moved since the last review

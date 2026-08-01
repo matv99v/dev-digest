@@ -71,6 +71,18 @@ export function FindingsTab({
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
 
+  // The timeline shows per-severity counters with a hover preview, and the
+  // findings it needs are already here — every review carries its own. Keyed by
+  // run so a row can find its own; reviews with no run id (older rows) are
+  // skipped rather than colliding under a shared key.
+  const findingsByRun = React.useMemo(() => {
+    const map = new Map<string, FindingRecord[]>();
+    for (const review of runs) {
+      if (review.run_id) map.set(review.run_id, review.findings);
+    }
+    return map;
+  }, [runs]);
+
   return (
     <section>
       {liveRunIds.length > 0 && (
@@ -131,6 +143,7 @@ export function FindingsTab({
           <RunHistory
             runs={prRuns ?? []}
             commits={prCommits}
+            findingsByRun={findingsByRun}
             onOpenTrace={handleOpenTrace}
             onGoToReview={handleGoToReview}
             onDelete={handleDelete}

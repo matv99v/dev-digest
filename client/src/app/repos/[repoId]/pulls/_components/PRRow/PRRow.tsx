@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import { RunCostBadge } from "@/components/run-cost-badge";
+import { FindingsCell } from "@/components/findings-badge";
+import { usePrReviews } from "@/lib/hooks/reviews";
 import type { PrMeta } from "@/lib/types";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
@@ -18,6 +20,17 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
+
+  // The FINDINGS counts ride along on the list payload, but the hover card's
+  // preview does not — it is fetched only once the reader actually hovers, so
+  // scrolling the list doesn't pull every PR's findings. React Query caches it
+  // under the same key the PR-detail page uses, so a hover warms that page too.
+  const [findingsHover, setFindingsHover] = React.useState(false);
+  const reviews = usePrReviews(pr.id, findingsHover);
+  const findings = React.useMemo(
+    () => (reviews.data ?? []).flatMap((r) => r.findings),
+    [reviews.data],
+  );
   return (
     <div
       onMouseEnter={() => setH(true)}
@@ -53,6 +66,15 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         ) : (
           <span style={s.muted}>—</span>
         )}
+      </div>
+      <div>
+        <FindingsCell
+          counts={pr.findings}
+          findings={findings}
+          loading={reviews.isLoading}
+          onHoverChange={setFindingsHover}
+          onOpen={() => router.push(`/repos/${repoId}/pulls/${pr.number}?tab=findings`)}
+        />
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">

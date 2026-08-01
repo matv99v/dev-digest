@@ -31,6 +31,41 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
 }
 
 /**
+ * Per-PR severity tally for the list's FINDINGS column. Like COST and unlike
+ * SCORE, this sums across EVERY review on the PR rather than only the latest:
+ * the column answers "what is wrong with this PR", and a re-run that surfaces a
+ * new problem must not hide what an earlier agent already found.
+ *
+ * DISMISSED findings are skipped. Dismissing is the user saying "not a real
+ * problem" — a dismissed finding is resolved, and letting it keep inflating the
+ * badge would make the column impossible to drive to zero. Accepted findings
+ * DO still count: accepting affirms the finding is real, so it stays on the
+ * board until the code changes.
+ *
+ * A PR with no live findings is absent from the map, so the caller renders "—"
+ * rather than three zeros — the same convention `sumCostByPr` uses below.
+ */
+export function rollupSeveritiesByPr(
+  rows: { prId: string | null; severity: string; dismissedAt: Date | null }[],
+): Map<string, SeverityCounts> {
+  const byPr = new Map<string, { severity: string }[]>();
+  for (const row of rows) {
+    if (!row.prId || row.dismissedAt != null) continue;
+    const bucket = byPr.get(row.prId);
+    if (bucket) bucket.push(row);
+    else byPr.set(row.prId, [row]);
+  }
+  const counts = new Map<string, SeverityCounts>();
+  for (const [prId, bucket] of byPr) {
+    const c = rollupSeverities(bucket);
+    // An unrecognised severity tallies nowhere, so a PR whose only findings are
+    // of an unknown severity would otherwise land as a bare 0/0/0 badge.
+    if (c.critical + c.warning + c.suggestion > 0) counts.set(prId, c);
+  }
+  return counts;
+}
+
+/**
  * Total review spend per PR for the list's COST column — the sum of EVERY
  * completed run, not just the newest one. A PR is typically reviewed several
  * times (re-runs, multiple agents), so "what has reviewing this PR cost me"

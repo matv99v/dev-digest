@@ -1,12 +1,9 @@
 import type { FindingActionKind } from "@devdigest/shared";
 
-/** Sort weight per severity (lower = shown first). */
-export const SEVERITY_ORDER: Record<string, number> = {
-  CRITICAL: 0,
-  WARNING: 1,
-  SUGGESTION: 2,
-  INFO: 3,
-};
+/** Sort weight per severity (lower = shown first). Re-exported from the shared
+ *  findings-badge component so this panel and the findings hover cards on the PR
+ *  list can never disagree about which finding is the worst one. */
+export { SEVERITY_ORDER } from "@/components/findings-badge";
 
 /** Confidence below this is hidden when "hide low confidence" is on. */
 export const LOW_CONFIDENCE_THRESHOLD = 0.65;

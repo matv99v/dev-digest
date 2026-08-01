@@ -9,6 +9,9 @@
     "run": "Run"
   },
   "tokensShort": "{count} tok",
+  "findingsHeader": "{count} findings",
+  "findingsLoading": "Findings",
+  "findingsMore": "+{count} more",
   "states": {
     "loading": "Loading…",
     "empty": "Nothing here yet",

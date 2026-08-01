@@ -11,6 +11,17 @@ package's own `INSIGHTS.md` — `server/`, `client/`, `reviewer-core/`, `e2e/`.
 ## What Doesn't Work
 <!-- Dead ends and antipatterns. The most valuable section — do not skip it. -->
 
+- **Never add a REQUIRED field to `RunStats` / `RunTrace`.** These schemas
+  describe the `run_traces.trace` jsonb document, and jsonb has no migration —
+  every trace already in the DB keeps its old shape forever. The failure is
+  silent because the read path never validates: `getRunTrace` casts
+  `row.trace as RunTrace` instead of parsing it, so a missing key sails through
+  the server and only surfaces far away as `undefined` reaching a formatter in
+  the UI. Make every new field `.nullish()` (not `.nullable()` — old documents
+  lack the key entirely, they don't hold null), and pin the old shape with a
+  fixture that omits it. — `server/src/modules/reviews/repository/run.repo.ts:183`,
+  `server/src/vendor/shared/contracts/trace.ts` `RunStats.cost_usd` (2026-08-01)
+
 ## Codebase Patterns
 <!-- Conventions and architecture decisions that span packages. -->
 

@@ -8,6 +8,7 @@
     "export": "Export",
     "run": "Run"
   },
+  "tokensShort": "{count} tok",
   "states": {
     "loading": "Loading…",
     "empty": "Nothing here yet",

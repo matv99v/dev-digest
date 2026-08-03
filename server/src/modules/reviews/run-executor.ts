@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, renderSkillBlocks } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -186,6 +186,10 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills — this agent's linked, doubly-enabled (skill.enabled AND the
+      // link's own enabled) skill bodies, in order. Independent of repo-intel.
+      const skills = await this.loadSkills(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -203,6 +207,9 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Linked skill bodies, in order. assemblePrompt omits the `## Skills /
+        // rules` section entirely when this is empty.
+        ...(skills.bodies.length > 0 ? { skills: skills.bodies } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -275,7 +282,7 @@ export class ReviewRunExecutor {
           findings: findingRows.length,
           grounding,
         },
-        prompt_assembly: outcome.assembly,
+        prompt_assembly: { ...outcome.assembly, skills_tokens: skills.tokens },
         tool_calls: outcome.chunks.map((c) => ({
           tool: 'review_file',
           args: c.label,
@@ -408,6 +415,38 @@ export class ReviewRunExecutor {
     } catch {
       return '';
     }
+  }
+
+  /**
+   * Resolve this agent's linked skills into rendered prompt blocks, in
+   * `order`. Filtering + rendering is the pure `renderSkillBlocks` helper
+   * (unit-tested directly); this method only adds the DB fetch, the Live Log
+   * lines (one per ENABLED skill — a disabled skill, at either gate, never
+   * appears in the log or the prompt), and the token count. Best-effort:
+   * never throws, since skills are additive enrichment, not required for a
+   * review to run.
+   */
+  private async loadSkills(
+    agentId: string,
+    runLog: RunLogger,
+  ): Promise<{ bodies: string[]; tokens: number }> {
+    let links;
+    try {
+      links = await this.agents.linkedSkills(agentId);
+    } catch (err) {
+      runLog.info(`skills: failed to load — ${(err as Error).message}`);
+      return { bodies: [], tokens: 0 };
+    }
+
+    const rendered = renderSkillBlocks(links);
+    if (rendered.length === 0) return { bodies: [], tokens: 0 };
+
+    for (const r of rendered) runLog.info(`skill "${r.name}" enabled — added to prompt`);
+
+    const bodies = rendered.map((r) => r.block);
+    const tokens = this.container.tokenizer.count(bodies.join('\n\n'));
+    runLog.info(`skills: ${rendered.length} enabled → ~${tokens} token(s)`);
+    return { bodies, tokens };
   }
 
   /**

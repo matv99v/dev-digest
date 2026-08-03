@@ -6,6 +6,7 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -18,11 +19,14 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, PR #483 (a controlled test-quality fixture — an
+ * uncovered branch with only a happy-path test), three skill rows (rubric +
+ * convention) linked to a fourth built-in agent, and the four built-in agents
+ * (General + Security + Performance + Test Quality), all on the default
+ * openrouter/deepseek-v4-flash provider+model.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the other tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -175,7 +179,164 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     ]);
   }
 
-  // ---- built-in agents (the three starter presets) ----
+  // ---- PR #483 (test-quality fixture: uncovered branch, happy-path-only test) ----
+  // Adds parseRetryAfter() with an explicit negative/zero/malformed-input branch,
+  // plus a test file that only exercises the valid-input happy path. Lets a human
+  // demonstrate the Test Quality Reviewer with its 3 skills OFF (misses the gap)
+  // vs ON (uncovered-branch-gate catches it).
+  let [pr483] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.number, 483)));
+  if (!pr483) {
+    [pr483] = await db
+      .insert(t.pullRequests)
+      .values({
+        workspaceId,
+        repoId,
+        number: 483,
+        title: 'Add retry-after parsing for rate-limited responses',
+        author: 'diego.ruiz',
+        branch: 'feat/retry-after-parsing',
+        base: 'main',
+        headSha: 'f7a8b9c0d1e2',
+        additions: 21,
+        deletions: 0,
+        filesCount: 2,
+        status: 'needs_review',
+        body: 'Parses the Retry-After header so callers know how long to back off.',
+      })
+      .returning();
+
+    await db.insert(t.prFiles).values([
+      {
+        prId: pr483!.id,
+        path: 'src/lib/parse-retry-after.ts',
+        additions: 13,
+        deletions: 0,
+        patch:
+          '@@ -0,0 +1,13 @@\n' +
+          '+/**\n' +
+          '+ * Parses the Retry-After header value into a number of seconds to wait\n' +
+          '+ * before retrying a rate-limited request. Falls back to a default when the\n' +
+          "+ * header is missing or the value can't be trusted.\n" +
+          '+ */\n' +
+          '+const DEFAULT_RETRY_AFTER_SECONDS = 30;\n' +
+          '+\n' +
+          '+export function parseRetryAfter(header: string | undefined): number {\n' +
+          '+  if (!header) return DEFAULT_RETRY_AFTER_SECONDS;\n' +
+          '+  const parsed = Number.parseInt(header, 10);\n' +
+          '+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_RETRY_AFTER_SECONDS;\n' +
+          '+  return parsed;\n' +
+          '+}',
+      },
+      {
+        prId: pr483!.id,
+        path: 'src/lib/parse-retry-after.test.ts',
+        additions: 8,
+        deletions: 0,
+        patch:
+          '@@ -0,0 +1,8 @@\n' +
+          "+import { describe, it, expect } from 'vitest';\n" +
+          "+import { parseRetryAfter } from './parse-retry-after.js';\n" +
+          '+\n' +
+          "+describe('parseRetryAfter', () => {\n" +
+          "+  it('parses a valid Retry-After header into seconds', () => {\n" +
+          "+    expect(parseRetryAfter('120')).toBe(120);\n" +
+          '+  });\n' +
+          '+});',
+      },
+    ]);
+
+    await db.insert(t.prCommits).values({
+      prId: pr483!.id,
+      sha: 'f7a8b9c0d1e2',
+      message: 'Parse Retry-After header with a default fallback',
+      author: 'diego.ruiz',
+    });
+  }
+
+  // ---- skills (rubric/convention rows for the Test Quality Reviewer) ----
+  const seedSkills: Array<{
+    name: string;
+    description: string;
+    type: (typeof t.skills.$inferInsert)['type'];
+    body: string;
+  }> = [
+    {
+      name: 'uncovered-branch-gate',
+      description:
+        "Flags a new or changed conditional branch whose non-happy-path outcome has no test.",
+      type: 'rubric',
+      body: `# Uncovered Branch Gate
+- Every new or changed conditional branch (if/else, guard clause, switch case,
+  thrown error, early return) needs a test exercising its non-happy-path
+  outcome.
+- If the diff adds a branch but the accompanying test only covers the
+  default/success path, flag it.
+- Name the specific input or condition that would reach the untested branch.`,
+    },
+    {
+      name: 'mock-overuse-gate',
+      description:
+        "Flags tests that mock the unit under test or assert on a mock's internal call shape instead of real behaviour.",
+      type: 'convention',
+      body: `# Mock Overuse Gate
+- Don't mock the unit actually under test — only mock its collaborators and
+  boundaries (DB, network, filesystem, clock).
+- Don't let asserting on a mock's internal call args/shape be the test's real
+  assertion; assert on observable behaviour instead.
+- A test should fail if the real implementation is deleted or broken. If it
+  would still pass, the mock has swallowed the behaviour under test.`,
+    },
+    {
+      name: 'flaky-test-smells',
+      description:
+        'Flags real timers, unseeded randomness, order-dependent tests, real network calls, and unawaited async assertions.',
+      type: 'convention',
+      body: `# Flaky Test Smells
+- Flag real timers or sleeps (\`setTimeout\`, \`sleep\`) instead of fake timers
+  or a deterministic await.
+- Flag unseeded randomness or \`Date.now()\` driving an assertion.
+- Flag order-dependent tests that only pass because of shared state left by
+  an earlier test.
+- Flag real (unmocked) network calls in a unit test.
+- Flag unawaited async assertions that can silently pass without ever
+  running.`,
+    },
+  ];
+
+  const skillIds: Record<string, string> = {};
+  for (const s of seedSkills) {
+    let [existingSkill] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, s.name)));
+    if (!existingSkill) {
+      [existingSkill] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: s.name,
+          description: s.description,
+          type: s.type,
+          source: 'manual',
+          body: s.body,
+          enabled: true,
+          version: 1,
+        })
+        .returning();
+      await db.insert(t.skillVersions).values({
+        skillId: existingSkill!.id,
+        version: 1,
+        body: s.body,
+        message: 'Initial version',
+      });
+    }
+    skillIds[s.name] = existingSkill!.id;
+  }
+
+  // ---- built-in agents (the four starter presets) ----
   // Prompt bodies live in ./seed-prompts.ts (mirrored in docs/agent-prompts/*.md).
   const seedAgents: Array<typeof t.agents.$inferInsert> = [
     {
@@ -211,6 +372,18 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description:
+        'Checks test quality — uncovered branches, missed corner cases, mock overuse, and flaky-test smells.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +391,23 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- link the 3 test-quality skills to the Test Quality Reviewer agent ----
+  const [testQualityAgent] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
+  if (testQualityAgent) {
+    const linkedSkillOrder = ['uncovered-branch-gate', 'mock-overuse-gate', 'flaky-test-smells'];
+    for (let i = 0; i < linkedSkillOrder.length; i++) {
+      const skillId = skillIds[linkedSkillOrder[i]!];
+      if (!skillId) continue;
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId: testQualityAgent.id, skillId, order: i, enabled: true })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

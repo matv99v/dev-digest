@@ -47,6 +47,10 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
+  /** Token count of the assembled skills block (Skills tab attribution in the
+   *  run trace). NULLISH, not nullable: traces persisted before this field
+   *  existed have no such key at all and must still parse. */
+  skills_tokens: z.number().int().nullish(),
   user: z.string(),
 });
 export type PromptAssembly = z.infer<typeof PromptAssembly>;

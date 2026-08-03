@@ -1,17 +1,17 @@
 # `@devdigest/api` — the engine (Fastify + Postgres)
 
 The DevDigest backend: imports repos and pull requests, indexes a repo with
-`repo-intel`, stores agents, and runs the reviewer (diff → `reviewer-core` →
-grounded structured findings). Fastify 5 + Drizzle ORM over Postgres (pgvector).
-Adapters (LLM, GitHub, git, ast-grep, …) sit behind a DI container so they can be
-swapped for mocks in tests.
+`repo-intel`, stores agents and skills, and runs the reviewer (diff → skills →
+`reviewer-core` → grounded structured findings). Fastify 5 + Drizzle ORM over
+Postgres (pgvector). Adapters (LLM, GitHub, git, ast-grep, …) sit behind a DI
+container so they can be swapped for mocks in tests.
 
-> This is the **starter** module set. Later course lessons add their own modules
-> (skills, intent/smart-diff, blast, brief/context/onboarding, eval/ci/hooks,
-> memory, plugins, …) — each is a self-contained `modules/<name>/` plugin plus,
-> usually, a slot it starts feeding the reviewer prompt. The DB schema already
-> contains **every** table; the unused ones simply sit empty until a lesson fills
-> them.
+> This is the **starter** module set, now with `skills` (L02) added. Later
+> course lessons add their own modules (intent/smart-diff, blast,
+> brief/context/onboarding, eval/ci/hooks, memory, plugins, …) — each is a
+> self-contained `modules/<name>/` plugin plus, usually, a slot it starts
+> feeding the reviewer prompt. The DB schema already contains **every** table;
+> the unused ones simply sit empty until a lesson fills them.
 
 - **Stack:** Fastify 5 (`@fastify/helmet`, `@fastify/rate-limit`, `@fastify/cors`,
   `fastify-sse-v2` for streaming run traces), Drizzle ORM, `postgres`, pgvector.
@@ -71,8 +71,9 @@ flowchart TB
   subgraph Review["Review & runs"]
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
   end
-  subgraph Agents["Agents"]
-    agents["agents<br/>/agents · /agents/:id"]
+  subgraph Agents["Agents & skills"]
+    agents["agents<br/>/agents · /agents/:id · /agents/:id/skills"]
+    skills["skills<br/>/skills · /skills/:id · /skills/:id/versions<br/>/skills/:id/stats · /skills/tokens · /skills/import/preview"]
   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]

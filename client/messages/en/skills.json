@@ -1,4 +1,7 @@
 {
+  "card": {
+    "noDescription": "No description"
+  },
   "page": {
     "crumbLab": "Skills Lab",
     "crumbSkills": "Skills",
@@ -7,6 +10,7 @@
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "menu": {
+      "createFromScratch": "Create from scratch",
       "fromFile": "Import from file",
       "fromUrl": "Import from URL",
       "community": "Search community skills…"
@@ -28,7 +32,59 @@
     "notFound": {
       "title": "Skill not found",
       "body": "It may have been deleted."
+    },
+    "tabs": {
+      "config": "Config",
+      "preview": "Preview",
+      "stats": "Stats",
+      "versions": "Versions"
     }
+  },
+  "editor": {
+    "title": "Configuration",
+    "enabled": "Enabled",
+    "name": "Name",
+    "description": "Description",
+    "descriptionHint": "This is the skill's interface — write it as a directive instruction describing WHEN to apply the skill, not just a summary of what it covers.",
+    "type": "Type",
+    "save": "Save skill",
+    "saving": "Saving…",
+    "saved": "Saved (v{version})",
+    "commitMessage": {
+      "title": "What changed?",
+      "label": "Summary",
+      "placeholder": "e.g. Tightened the scope rule",
+      "hint": "Recorded on the new version, like a commit message.",
+      "cancel": "Cancel",
+      "save": "Save version"
+    }
+  },
+  "body": {
+    "unsaved": "unsaved",
+    "tokens": "{count} tokens"
+  },
+  "stats": {
+    "usedBy": "Used by",
+    "agentsCount": "{count} agents",
+    "tokensLabel": "Body tokens",
+    "versionsLabel": "Versions",
+    "lastChanged": "Last changed",
+    "never": "—",
+    "agentsUsingTitle": "Agents using this skill",
+    "none": "Not linked to any agent yet.",
+    "disabledForAgent": "disabled for this agent",
+    "open": "Open",
+    "metricsComingSoon": "Pull-frequency, accept-rate, and findings-by-category will show up here once the eval pipeline (a later lesson) attributes findings back to the skill that flagged them."
+  },
+  "versions": {
+    "title": "Version history",
+    "count": "{count} versions",
+    "description": "Every save snapshots the body so eval runs stay reproducible against the exact text they scored.",
+    "current": "Current",
+    "diff": "Diff",
+    "diffModalTitle": "v{version} → current",
+    "restore": "Restore",
+    "restoring": "Restoring…"
   },
   "drawer": {
     "title": "Add a skill",
@@ -45,11 +101,17 @@
     "nameHint": "Optional — derived from the first heading if blank.",
     "namePlaceholder": "pr-quality-rubric",
     "bodyLabel": "Skill body (Markdown)",
-    "bodyHint": "Pasted content is wrapped as untrusted data — never executed as instructions.",
+    "bodyHint": "The body becomes instructions in every agent's prompt once enabled — imported skills are saved disabled until you review them.",
     "bodyPlaceholder": "# Rule\nDescribe the rule…",
     "importing": "Importing…",
-    "import": "Import skill",
-    "success": "Imported \"{name}\" (stored as untrusted data)."
+    "import": "Preview",
+    "success": "Imported \"{name}\" — disabled until you vet + enable it.",
+    "previewTitle": "Preview",
+    "warningsTitle": "Notes",
+    "back": "← Edit",
+    "confirm": "Save skill",
+    "confirmHint": "Saves as disabled — review the body, then enable it from the skill's Config tab.",
+    "confirming": "Saving…"
   },
   "url": {
     "label": "Skill URL",
@@ -84,10 +146,12 @@
       "manual": "Manual",
       "extracted": "Extracted",
       "community": "Community",
-      "imported_url": "Imported"
+      "imported_url": "Imported",
+      "imported_file": "Imported"
     }
   },
   "preview": {
+    "subtitle": "Rendered as the reviewing agent receives it.",
     "untrustedBadge": "untrusted source",
     "enabled": "Enabled",
     "disabled": "Disabled",

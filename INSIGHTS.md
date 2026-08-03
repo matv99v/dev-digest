@@ -35,6 +35,19 @@ package's own `INSIGHTS.md` — `server/`, `client/`, `reviewer-core/`, `e2e/`.
   on the next message. — `.claude/skills/engineering-insights/SKILL.md:4`
   (2026-08-01)
 
+- **A zod field with `.default()` is still REQUIRED in the `z.infer` type used
+  for object literals.** `.default()` only makes the key optional on `.parse()`
+  *input*; the inferred TS type (what you get constructing a fixture by hand,
+  not via `.parse()`) still demands it. Adding `skill_count:
+  z.number().int().default(0)` to `Agent` in both copies of
+  `contracts/knowledge.ts` broke three existing test fixtures that build an
+  `Agent` object literal directly — TypeScript did not let the default fill it
+  in. When extending a shared contract with a defaulted field, grep both
+  copies' consumers for object-literal fixtures of that type, not just
+  `.parse()` call sites. — `server/src/vendor/shared/contracts/knowledge.ts`,
+  `client/src/vendor/shared/contracts/knowledge.ts`,
+  `client/src/app/agents/_components/AgentCard/AgentCard.test.tsx:11` (2026-08-03)
+
 ## Recurring Errors & Fixes
 <!-- Errors seen more than once, with the fix. -->
 

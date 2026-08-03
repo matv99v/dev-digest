@@ -115,7 +115,13 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+export const SkillSource = z.enum([
+  'manual',
+  'imported_url',
+  'imported_file',
+  'extracted',
+  'community',
+]);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -139,6 +145,50 @@ export const CommunitySkill = z.object({
   desc: z.string(),
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
+
+/** One immutable snapshot from `skill_versions`. `message` is the optional
+ *  human summary of what changed (like a commit message), set at save time. */
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  message: z.string().nullish(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/** Result of parsing an uploaded/pasted markdown file — nothing is persisted
+ *  until the caller POSTs it as a real skill. */
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  warnings: z.array(z.string()),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
+/** One agent using a skill, for the Stats tab's "agents using this skill" list. */
+export const SkillStatsAgent = z.object({
+  id: z.string(),
+  name: z.string(),
+  link_enabled: z.boolean(),
+});
+export type SkillStatsAgent = z.infer<typeof SkillStatsAgent>;
+
+/** Skill usage stats — deliberately DB-only. Findings carry no skill
+ *  attribution (no FK from `findings` to `skills`), so pull-frequency,
+ *  accept-rate, and findings-by-category are NOT modeled here; they arrive
+ *  with the eval pipeline. */
+export const SkillStats = z.object({
+  agents_total: z.number().int(),
+  agents_enabled: z.number().int(),
+  agents: z.array(SkillStatsAgent),
+  versions: z.number().int(),
+  tokens: z.number().int(),
+  last_changed_at: z.string().nullish(),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
 
 // ---- Conventions ----
 export const ConventionCandidate = z.object({
@@ -188,6 +238,9 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  // Number of linked skills (regardless of each link's own enabled state) —
+  // for the Agents list card, computed server-side to avoid an N+1 fetch.
+  skill_count: z.number().int().default(0),
 });
 export type Agent = z.infer<typeof Agent>;
 
@@ -195,6 +248,7 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  enabled: z.boolean().default(true),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 

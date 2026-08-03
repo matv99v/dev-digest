@@ -7,7 +7,8 @@ import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, rollupSeveritiesByPr, sumCostByPr } from './status.js';
+import type { SeverityCounts } from './status.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -113,8 +114,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     // Latest-review SCORE per PR for the list's score ring. Computed on read
     // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // grouping is cheap.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
     if (prIds.length > 0) {
@@ -127,6 +127,43 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       for (const rv of reviewRows) {
         if (!latestReviewByPr.has(rv.prId)) latestReviewByPr.set(rv.prId, { score: rv.score });
       }
+    }
+
+    // TOTAL cost per PR for the list's COST column. Cost lives on agent_runs
+    // (not reviews), so it needs its own pass. Unlike the score above — which is
+    // deliberately the LATEST review's — this is summed across every completed
+    // run, because the question a cost column answers is "what has this PR cost
+    // me", and a PR is normally reviewed many times. Ordering is irrelevant to a
+    // sum, so unlike the score query this one doesn't need an ORDER BY.
+    let totalCostByPr = new Map<string, number>();
+    if (prIds.length > 0) {
+      const runRows = await container.db
+        .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+        .from(t.agentRuns)
+        .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
+      totalCostByPr = sumCostByPr(runRows);
+    }
+
+    // Per-severity FINDINGS breakdown per PR for the list's findings column,
+    // summed across every review on the PR (see `rollupSeveritiesByPr` for why
+    // that, and not the latest review only). `findings` carries no pr_id — the
+    // only path to a PR is findings.review_id → reviews.pr_id — so unlike the
+    // two passes above this one needs a join. No `reviews.kind` filter: the
+    // join only reaches reviews that own findings, and `summary` rows have none.
+    // `dismissed_at` is selected rather than filtered in SQL so the "a dismissed
+    // finding is resolved" rule lives in the pure, tested helper.
+    let findingsByPr = new Map<string, SeverityCounts>();
+    if (prIds.length > 0) {
+      const findingRows = await container.db
+        .select({
+          prId: t.reviews.prId,
+          severity: t.findings.severity,
+          dismissedAt: t.findings.dismissedAt,
+        })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+        .where(inArray(t.reviews.prId, prIds));
+      findingsByPr = rollupSeveritiesByPr(findingRows);
     }
 
     const now = Date.now();
@@ -153,6 +190,8 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost_usd: totalCostByPr.get(r.id) ?? null,
+        findings: findingsByPr.get(r.id) ?? null,
       };
     });
   });

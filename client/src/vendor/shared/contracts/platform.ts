@@ -154,6 +154,14 @@ export type Repo = z.infer<typeof Repo>;
 export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
 export type PrStatus = z.infer<typeof PrStatus>;
 
+/** Live (non-dismissed) finding counts per severity, for the list's FINDINGS column. */
+export const PrFindingCounts = z.object({
+  critical: z.number().int(),
+  warning: z.number().int(),
+  suggestion: z.number().int(),
+});
+export type PrFindingCounts = z.infer<typeof PrFindingCounts>;
+
 export const PrMeta = z.object({
   id: z.string().nullish(),
   number: z.number().int(),
@@ -170,6 +178,14 @@ export const PrMeta = z.object({
   updated_at: z.string().nullish(),
   // Latest-review score (list endpoint only; null/absent until reviewed).
   score: z.number().int().nullish(),
+  // TOTAL cost in USD across every completed run (list endpoint only).
+  // Null/absent when the PR has never been reviewed, or every run predates cost
+  // tracking — the list renders "—" for those, never "$0.00".
+  cost_usd: z.number().nullish(),
+  // Live findings per severity, summed across every review on the PR (list
+  // endpoint only). Null/absent when the PR has none — the list renders "—"
+  // rather than three zeros.
+  findings: PrFindingCounts.nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

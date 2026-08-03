@@ -31,6 +31,62 @@ export function rollupSeverities(rows: { severity: string }[]): SeverityCounts {
 }
 
 /**
+ * Per-PR severity tally for the list's FINDINGS column. Like COST and unlike
+ * SCORE, this sums across EVERY review on the PR rather than only the latest:
+ * the column answers "what is wrong with this PR", and a re-run that surfaces a
+ * new problem must not hide what an earlier agent already found.
+ *
+ * DISMISSED findings are skipped. Dismissing is the user saying "not a real
+ * problem" — a dismissed finding is resolved, and letting it keep inflating the
+ * badge would make the column impossible to drive to zero. Accepted findings
+ * DO still count: accepting affirms the finding is real, so it stays on the
+ * board until the code changes.
+ *
+ * A PR with no live findings is absent from the map, so the caller renders "—"
+ * rather than three zeros — the same convention `sumCostByPr` uses below.
+ */
+export function rollupSeveritiesByPr(
+  rows: { prId: string | null; severity: string; dismissedAt: Date | null }[],
+): Map<string, SeverityCounts> {
+  const byPr = new Map<string, { severity: string }[]>();
+  for (const row of rows) {
+    if (!row.prId || row.dismissedAt != null) continue;
+    const bucket = byPr.get(row.prId);
+    if (bucket) bucket.push(row);
+    else byPr.set(row.prId, [row]);
+  }
+  const counts = new Map<string, SeverityCounts>();
+  for (const [prId, bucket] of byPr) {
+    const c = rollupSeverities(bucket);
+    // An unrecognised severity tallies nowhere, so a PR whose only findings are
+    // of an unknown severity would otherwise land as a bare 0/0/0 badge.
+    if (c.critical + c.warning + c.suggestion > 0) counts.set(prId, c);
+  }
+  return counts;
+}
+
+/**
+ * Total review spend per PR for the list's COST column — the sum of EVERY
+ * completed run, not just the newest one. A PR is typically reviewed several
+ * times (re-runs, multiple agents), so "what has reviewing this PR cost me"
+ * is the only reading of a single cost figure that isn't misleading: showing
+ * one run's cost under-reports a 7-run PR by roughly 7×.
+ *
+ * Runs with an unknown cost (unpriced model, or recorded before cost tracking)
+ * are SKIPPED, not treated as poisoning the total — one unknown run must not
+ * blank a PR that has demonstrably cost money. A PR with no priced run at all
+ * is simply absent from the map, so the caller renders "—" rather than $0.00.
+ */
+export function sumCostByPr(rows: { prId: string | null; costUsd: number | null }[]): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.prId || row.costUsd == null) continue;
+    totals.set(row.prId, (totals.get(row.prId) ?? 0) + row.costUsd);
+  }
+  return totals;
+}
+
+/**
  * Review-freshness status for the PR list. Merged/closed PRs keep their GitHub
  * merge state; open PRs map to:
  *  - `needs_review` — never reviewed, OR head moved since the last review

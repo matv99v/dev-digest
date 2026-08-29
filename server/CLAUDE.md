@@ -4,8 +4,9 @@ Fastify 5 + Drizzle/Postgres (pgvector), on :3001. Uses **pnpm**.
 
 ## Before answering
 
-Search `server/docs/`, `server/specs/` and `server/INSIGHTS.md` for the topic **before**
-reading source. They are curated and may already answer it.
+Read `server/INSIGHTS.md` first — it records what already cost someone time here — then
+`server/docs/` and `server/specs/` for the topic. Say in one line what you took from
+them before you start.
 
 ## Commands
 

@@ -4,8 +4,9 @@ The review engine: diff → prompt → LLM → grounded findings.
 
 ## Before answering
 
-Search `reviewer-core/docs/`, `reviewer-core/specs/` and `reviewer-core/INSIGHTS.md` for
-the topic **before** reading source. They are curated and may already answer it.
+Read `reviewer-core/INSIGHTS.md` first — it records what already cost someone time here
+— then `reviewer-core/docs/` and `reviewer-core/specs/` for the topic. Say in one line
+what you took from them before you start.
 
 ## Commands
 

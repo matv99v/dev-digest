@@ -8,9 +8,10 @@ sit empty on purpose) and `reviewer-core` exposes prompt slots nothing feeds yet
 
 ## Before answering
 
-A package's `README.md`, `docs/`, `specs/` and `INSIGHTS.md` are curated and may already
-answer the question. Check the relevant one in *Use when* **first** — don't rediscover
-from source what someone already wrote down.
+Read the `INSIGHTS.md` of the package you are about to work in **first** — it records
+what already cost someone time there. Then check the rest of *Use when* for the topic.
+Say in one line what you took from them before you start. Don't rediscover from source
+what someone already wrote down.
 
 ## Repo shape
 
@@ -51,6 +52,12 @@ Four standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`.
 - Edit a `db/migrations/*.sql` after it has merged — add a new migration.
 - Run `docker compose down -v` — `-v` destroys the `devdigest_pgdata` volume along with
   every repo and review already imported.
+
+## Before finishing
+
+If the session produced a durable lesson — a non-obvious cause, a dead end, a correction
+you had to be given — record it with `/engineering-insights`. If nothing was learned that
+isn't already written down, record nothing.
 
 ## Use when
 

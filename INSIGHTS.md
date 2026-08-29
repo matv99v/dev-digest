@@ -1,18 +1,49 @@
-# Insights — DevDigest (cross-package)
+# Insights — root (config & CI)
 
-Lessons learned the hard way that span more than one package. Anything scoped to a
-single package goes in that package's `INSIGHTS.md` instead.
+Lessons about root configuration, CI workflows, `scripts/`, lockfiles, and tooling —
+things that are not any module's code.
 
-One entry per thing that cost real time. Newest first. Keep each to cause + rule —
-longer reasoning belongs in `docs/`.
+**A lesson about module code never lands here.** It is split across the modules it
+concerns, each file stating the part that matters there, even when that means two files.
 
-When an entry has bitten twice, promote its **rule** into `CLAUDE.md` and leave the
-cause here.
+Append with `/engineering-insights`. **Never rewrite or delete an entry** — correct an
+outdated one by adding a newer dated entry that supersedes it.
 
-<!-- Format:
-## YYYY-MM-DD — one-line symptom
-**Cause:** what was actually wrong.
-**Rule:** what to do differently next time.
+When an entry has bitten twice, promote its **Rule** into `CLAUDE.md` and leave the cause
+here. Architectural decisions with reasoning belong in `docs/`, not here. Prune
+quarterly; past ~30 entries, split by domain.
+
+<!-- Entry format — newest first inside its section:
+### YYYY-MM-DD — one-line statement of the finding
+**Cause:** what was actually wrong (omit when nothing failed).
+**Rule:** what to do or avoid next time. Required.
+**Evidence:** `path/to/file.ts:42`. Required.
 -->
+
+## What Works
+
+_No entries yet._
+
+## What Doesn't Work
+
+_No entries yet._
+
+## Codebase Patterns
+
+_No entries yet._
+
+## Tool & Library Notes
+
+_No entries yet._
+
+## Recurring Errors & Fixes
+
+_No entries yet._
+
+## Session Notes
+
+_No entries yet._
+
+## Open Questions
 
 _No entries yet._

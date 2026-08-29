@@ -4,8 +4,9 @@ Next.js 15 (App Router) + React 19 + TanStack Query, on :3000. Uses **pnpm**.
 
 ## Before answering
 
-Search `client/docs/`, `client/specs/` and `client/INSIGHTS.md` for the topic **before**
-reading source. They are curated and may already answer it.
+Read `client/INSIGHTS.md` first — it records what already cost someone time here — then
+`client/docs/` and `client/specs/` for the topic. Say in one line what you took from
+them before you start.
 
 ## Commands
 

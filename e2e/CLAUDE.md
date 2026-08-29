@@ -4,9 +4,10 @@ Deterministic browser flows over the web app, driven by the `agent-browser` CLI.
 
 ## Before answering
 
-Search `e2e/docs/`, `e2e/specs/` and `e2e/INSIGHTS.md` for the topic **before** reading
-source. They are curated and may already answer it. (`e2e/specs/` is prose — the
-runnable flows are in `e2e/flows/`.)
+Read `e2e/INSIGHTS.md` first — it records what already cost someone time here, including
+why a flow went flaky — then `e2e/docs/` and `e2e/specs/` for the topic. Say in one line
+what you took from them before you start. (`e2e/specs/` is prose — the runnable flows are
+in `e2e/flows/`.)
 
 ## Commands
 

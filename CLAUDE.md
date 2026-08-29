@@ -9,8 +9,8 @@ sit empty on purpose) and `reviewer-core` exposes prompt slots nothing feeds yet
 ## Before answering
 
 A package's `README.md`, `docs/`, `specs/` and `INSIGHTS.md` are curated and may already
-answer the question. Check the relevant one in *Where to look* **first** — don't
-rediscover from source what someone already wrote down.
+answer the question. Check the relevant one in *Use when* **first** — don't rediscover
+from source what someone already wrote down.
 
 ## Repo shape
 
@@ -52,12 +52,12 @@ Four standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`.
 - Run `docker compose down -v` — `-v` destroys the `devdigest_pgdata` volume along with
   every repo and review already imported.
 
-## Where to look
+## Use when
 
-- architecture, API map, routes, what works today → `README.md`
-- testing strategy and CI → `TESTING.md`
-- writing an agent's system prompt → `docs/agent-prompts/README.md`
-- gotchas already hit here → `INSIGHTS.md`
-- planning a feature → `specs/`
+- architecture, API map, routes, what works today → read `README.md`
+- testing strategy and CI → read `TESTING.md`
+- writing an agent's system prompt → read `docs/agent-prompts/README.md`
+- gotchas already hit here → read `INSIGHTS.md`
+- planning a feature → read `specs/`
 - working inside a package → its own `CLAUDE.md` loads automatically. Its `docs/`,
-  `specs/` and `INSIGHTS.md` do **not** — open them yourself.
+  `specs/` and `INSIGHTS.md` do **not** — read them yourself.

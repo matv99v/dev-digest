@@ -39,9 +39,9 @@ Hold these when adding code. Breaking one still compiles.
 - `@devdigest/shared` resolves to `../server/src/vendor/shared`. The contracts are
   borrowed from the server, not owned here.
 
-## Where to look
+## Use when
 
-- the review pipeline → `README.md`
-- gotchas already hit here → `INSIGHTS.md`
-- design decisions → `docs/`
-- planning a feature → `specs/`
+- the review pipeline → read `README.md`
+- gotchas already hit here → read `INSIGHTS.md`
+- design decisions → read `docs/`
+- planning a feature → read `specs/`

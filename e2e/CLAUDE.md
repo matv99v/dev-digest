@@ -40,10 +40,10 @@ Hold these when adding a flow.
 
 - Run `docker compose down -v` to "reset" — it destroys the dev DB volume.
 
-## Where to look
+## Use when
 
-- how a flow works, and current coverage → `README.md`
-- the suite's place in CI → `../TESTING.md`
-- gotchas already hit here → `INSIGHTS.md`
-- design decisions → `docs/`
-- planning a flow → `specs/`
+- how a flow works, and current coverage → read `README.md`
+- the suite's place in CI → read `../TESTING.md`
+- gotchas already hit here → read `INSIGHTS.md`
+- design decisions → read `docs/`
+- planning a flow → read `specs/`

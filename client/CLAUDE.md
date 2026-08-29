@@ -42,11 +42,11 @@ Hold these when adding code. Breaking one still compiles.
 - Edit `src/vendor/ui` or `src/vendor/shared` in place — vendored; extend them instead.
 - Touch `.next/`.
 
-## Where to look
+## Use when
 
-- UI route map → `README.md`
-- design-system primitives → `src/vendor/ui/README.md`
-- testing strategy and CI → `../TESTING.md`
-- gotchas already hit here → `INSIGHTS.md`
-- design decisions → `docs/`
-- planning a feature → `specs/`
+- UI route map → read `README.md`
+- design-system primitives → read `src/vendor/ui/README.md`
+- testing strategy and CI → read `../TESTING.md`
+- gotchas already hit here → read `INSIGHTS.md`
+- design decisions → read `docs/`
+- planning a feature → read `specs/`

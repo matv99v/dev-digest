@@ -49,11 +49,11 @@ Hold these when adding code. Breaking one still compiles.
 - Edit `src/vendor/shared` in place — it is the **canonical** contracts copy. Add new
   files instead.
 
-## Where to look
+## Use when
 
-- request/DI flow, API map → `README.md`
-- the codebase indexer → `src/modules/repo-intel/README.md`
-- testing strategy and CI → `../TESTING.md`
-- gotchas already hit here → `INSIGHTS.md`
-- design decisions → `docs/`
-- planning a feature → `specs/`
+- request/DI flow, API map → read `README.md`
+- the codebase indexer → read `src/modules/repo-intel/README.md`
+- testing strategy and CI → read `../TESTING.md`
+- gotchas already hit here → read `INSIGHTS.md`
+- design decisions → read `docs/`
+- planning a feature → read `specs/`

@@ -82,6 +82,11 @@ export class ReviewRepository {
     return runRepo.listRunsForPull(this.db, workspaceId, prId);
   }
 
+  /** Latest stored cost per PR (newest run that HAS one) — the list's COST column. */
+  latestRunCostByPr(workspaceId: string, prIds: string[]): Promise<Map<string, number>> {
+    return runRepo.latestRunCostByPr(this.db, workspaceId, prIds);
+  }
+
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
   deleteAgentRun(workspaceId: string, runId: string): Promise<boolean> {
     return runRepo.deleteAgentRun(this.db, workspaceId, runId);
@@ -157,6 +162,8 @@ export class ReviewRepository {
       tokensOut: number;
       findingsCount: number;
       grounding: string;
+      /** USD cost of the run; null when unknown (unpriced model) or on failure. */
+      costUsd?: number | null;
       /** Review score (0-100); null on failed/cancelled runs. */
       score?: number | null;
       /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */

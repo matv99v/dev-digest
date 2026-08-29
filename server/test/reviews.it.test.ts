@@ -201,6 +201,7 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
     expect(trace.config.model).toBe('gpt-4.1');
     expect(trace.stats.grounding).toBe('1/2 passed');
+    expect(trace.stats.cost_usd).toBeCloseTo(0.001, 6);
     expect(trace.log.length).toBeGreaterThan(0);
 
     // agent_runs row populated for A5 to aggregate
@@ -208,6 +209,61 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     expect(run!.status).toBe('done');
     expect(run!.findingsCount).toBe(1);
     expect(run!.grounding).toBe('1/2 passed');
+    // The engine's cost must survive persistence — it used to be dropped on the
+    // floor in run-executor, which is what the Run Cost Badge depends on.
+    expect(run!.costUsd).toBeCloseTo(0.001, 6);
+
+    await app.close();
+  });
+
+  it('run cost reaches the UI: persisted on the run, surfaced on /runs and the PR list', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Cost', provider: 'openai', model: 'gpt-4.1', system_prompt: 'cost' },
+      })
+    ).json();
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    // the run history (PR detail timeline + verdict banner read this)
+    const runs = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    expect(runs).toHaveLength(1);
+    expect(runs[0].cost_usd).toBeCloseTo(0.001, 6);
+    expect(runs[0].tokens_in).toBe(100);
+
+    // the PR list's COST column: latest priced run for that PR
+    const pulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    const listed = pulls.find((p: { id: string }) => p.id === pr.id);
+    expect(listed.cost_usd).toBeCloseTo(0.001, 6);
+
+    await app.close();
+  });
+
+  it('a failed run stores no cost (renders as "—", not $0.00)', async () => {
+    // A structured fixture that fails Review schema validation makes the run fail.
+    const app = await appWith({ nonsense: true });
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Broken', provider: 'openai', model: 'gpt-4.1', system_prompt: 'x' },
+      })
+    ).json();
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const runs = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    expect(runs[0].status).toBe('failed');
+    expect(runs[0].cost_usd).toBeNull();
+
+    // …and the PR list column stays empty rather than claiming the PR was free
+    const pulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    expect(pulls.find((p: { id: string }) => p.id === pr.id).cost_usd).toBeNull();
 
     await app.close();
   });

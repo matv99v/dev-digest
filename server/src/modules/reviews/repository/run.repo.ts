@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
@@ -59,12 +59,45 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
+    cost_usd: run.costUsd,
     findings_count: run.findingsCount,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
     score: run.score,
     blockers: run.blockers,
   }));
+}
+
+/**
+ * Latest stored cost per PR — the PR list's COST column. "Latest" is the newest
+ * run that actually HAS a cost, so a later failed run (which stores none) does
+ * not blank the column, exactly as a failed run does not blank the score ring
+ * beside it. Same newest-first + JS-grouping shape as the score lookup in
+ * `pulls/routes.ts`; the list is small, so one IN-query is cheap.
+ */
+export async function latestRunCostByPr(
+  db: Db,
+  workspaceId: string,
+  prIds: string[],
+): Promise<Map<string, number>> {
+  const byPr = new Map<string, number>();
+  if (prIds.length === 0) return byPr;
+  const rows = await db
+    .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+    .from(t.agentRuns)
+    .where(
+      and(
+        eq(t.agentRuns.workspaceId, workspaceId),
+        inArray(t.agentRuns.prId, prIds),
+        isNotNull(t.agentRuns.costUsd),
+      ),
+    )
+    .orderBy(desc(t.agentRuns.ranAt));
+  // Rows are newest-first → first seen per PR is the latest priced run.
+  for (const r of rows) {
+    if (r.prId && r.costUsd != null && !byPr.has(r.prId)) byPr.set(r.prId, r.costUsd);
+  }
+  return byPr;
 }
 
 /**
@@ -148,6 +181,8 @@ export async function completeAgentRun(
     tokensOut: number;
     findingsCount: number;
     grounding: string;
+    /** USD cost of the run; null when unknown (unpriced model) or on failure. */
+    costUsd?: number | null;
     /** Review score (0-100); null on failed/cancelled runs. */
     score?: number | null;
     /** Findings that tripped the agent's gate; 0 on failed/cancelled runs. */
@@ -163,6 +198,7 @@ export async function completeAgentRun(
       durationMs: values.durationMs,
       tokensIn: values.tokensIn,
       tokensOut: values.tokensOut,
+      costUsd: values.costUsd ?? null,
       findingsCount: values.findingsCount,
       grounding: values.grounding,
       score: values.score ?? null,

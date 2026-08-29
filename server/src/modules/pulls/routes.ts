@@ -129,6 +129,10 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Latest run COST per PR for the list's cost column — same latest-wins shape
+    // as the score above, read off `agent_runs` (where cost is snapshotted).
+    const costByPr = await container.reviewRepo.latestRunCostByPr(workspaceId, prIds);
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -153,6 +157,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         opened_at: r.openedAt?.toISOString() ?? null,
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
+        cost_usd: costByPr.get(r.id) ?? null,
       };
     });
   });

@@ -158,6 +158,7 @@ export function FindingsTab({
           <ReviewRunAccordion
             key={review.id}
             review={review}
+            run={prRuns?.find((x) => x.run_id === review.run_id)}
             prId={prId}
             defaultOpen={i === 0}
             repoFullName={repoFullName}

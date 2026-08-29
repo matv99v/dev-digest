@@ -62,6 +62,9 @@ export const RunStats = z.object({
   duration_ms: z.number().int(),
   tokens_in: z.number().int(),
   tokens_out: z.number().int(),
+  /** USD cost of the run, snapshotted at completion. Nullish — traces written
+      before cost attribution existed have no field at all, and must still parse. */
+  cost_usd: z.number().nullish(),
   findings: z.number().int(),
   grounding: z.string(),
 });
@@ -102,6 +105,9 @@ export const RunSummary = z.object({
   duration_ms: z.number().int().nullable(),
   tokens_in: z.number().int().nullable(),
   tokens_out: z.number().int().nullable(),
+  /** USD cost of the run; null when unknown (unpriced model, or a run that
+      predates cost attribution) — the UI renders '—', never '$0.00'. */
+  cost_usd: z.number().nullable(),
   findings_count: z.number().int().nullable(),
   grounding: z.string().nullable(),
   ran_at: z.string().nullable(),

@@ -26,7 +26,17 @@ _No entries yet._
 
 ## Codebase Patterns
 
-_No entries yet._
+### 2026-08-29 — A new field on the RunTrace document must be `.nullish()`, never `.nullable()`
+**Cause:** `run_traces` stores the whole trace as ONE jsonb document, and old rows are
+never migrated — so a trace written before a field existed has no such key at all, not a
+null. `.nullable()` still requires the key to be present, so it rejects every historical
+trace on read. This only shows up against old data, never in a fresh DB or in tests.
+**Rule:** Fields added to `RunStats` / `RunTrace` are `.nullish()`, and the UI renders the
+missing case. Only a field backed by a real `agent_runs` column may be `.nullable()` — the
+`ALTER TABLE` backfills existing rows to NULL, so the key is always there.
+**Evidence:** `src/vendor/shared/contracts/trace.ts:67` (`cost_usd` on RunStats, jsonb →
+nullish) vs `:110` (`cost_usd` on RunSummary, a column → nullable);
+`src/db/schema/runs.ts:50`.
 
 ## Tool & Library Notes
 

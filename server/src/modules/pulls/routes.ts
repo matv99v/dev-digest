@@ -113,8 +113,8 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     // Latest-review SCORE per PR for the list's score ring. Computed on read
     // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // grouping is cheap. The per-severity FINDINGS breakdown below is computed
+    // the same way.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
     if (prIds.length > 0) {
@@ -132,6 +132,11 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     // Latest run COST per PR for the list's cost column — same latest-wins shape
     // as the score above, read off `agent_runs` (where cost is snapshotted).
     const costByPr = await container.reviewRepo.latestRunCostByPr(workspaceId, prIds);
+
+    // Per-severity finding counts (across ALL of a PR's reviews, not just the
+    // latest) for the list's FINDINGS column — sums to the same total as the
+    // "N findings" badge on that PR's detail page.
+    const findingCountsByPr = await container.reviewRepo.findingCountsByPr(workspaceId, prIds);
 
     const now = Date.now();
     return rows.map((r) => {
@@ -158,6 +163,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.get(r.id) ?? null,
+        findings_by_severity: findingCountsByPr.get(r.id) ?? null,
       };
     });
   });

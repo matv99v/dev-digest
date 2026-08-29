@@ -243,6 +243,32 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('findings_by_severity reaches the PR list, grouped across all reviews', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Sev', provider: 'openai', model: 'gpt-4.1', system_prompt: 'sev' },
+      })
+    ).json();
+
+    // An unreviewed PR carries no findings breakdown yet.
+    const beforePulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    expect(beforePulls.find((p: { id: string }) => p.id === pr.id).findings_by_severity).toBeNull();
+
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    // Grounding keeps only the CRITICAL finding (line 11) from REVIEW_FIXTURE.
+    const afterPulls = (await app.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    const listed = afterPulls.find((p: { id: string }) => p.id === pr.id);
+    expect(listed.findings_by_severity).toEqual({ CRITICAL: 1, WARNING: 0, SUGGESTION: 0 });
+
+    await app.close();
+  });
+
   it('a failed run stores no cost (renders as "—", not $0.00)', async () => {
     // A structured fixture that fails Review schema validation makes the run fail.
     const app = await appWith({ nonsense: true });

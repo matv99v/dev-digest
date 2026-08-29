@@ -7,7 +7,7 @@
 
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
-import type { ReviewRecord, RunSummary, Verdict } from "@devdigest/shared";
+import type { ReviewRecord, RunSummary, Verdict, Severity } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
@@ -31,6 +31,8 @@ export function ReviewRunAccordion({
   repoFullName,
   headSha,
   targetRunId = null,
+  targetSeverity = null,
+  targetFindingId = null,
   targetNonce = 0,
 }: {
   review: ReviewRecord;
@@ -42,19 +44,48 @@ export function ReviewRunAccordion({
   repoFullName?: string | null;
   headSha?: string | null;
   /** When this matches review.run_id, the accordion opens and scrolls into view
-   *  (driven from the Timeline: clicking an agent name navigates here). */
+   *  (driven from the Timeline: clicking an agent name, a severity counter, or
+   *  a finding in its hover preview navigates here). */
   targetRunId?: string | null;
+  /** A severity counter was clicked — toggles the panel's severity filter
+   *  (clicking the same severity again clears it; this is the only way to
+   *  clear it, since the panel itself has no chip row). */
+  targetSeverity?: Severity | null;
+  /** A specific finding was picked from a hover preview — clears any severity
+   *  filter and scrolls straight to that finding's card. */
+  targetFindingId?: string | null;
   targetNonce?: number;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
+  const [severityFilter, setSeverityFilter] = React.useState<Severity | null>(null);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const isTarget = !!review.run_id && review.run_id === targetRunId;
+
   React.useEffect(() => {
-    if (review.run_id && review.run_id === targetRunId) {
-      setOpen(true);
-      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!isTarget) return;
+    setOpen(true);
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (targetFindingId) {
+      setSeverityFilter(null);
+    } else if (targetSeverity) {
+      setSeverityFilter((prev) => (prev === targetSeverity ? null : targetSeverity));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetRunId, targetNonce, review.run_id]);
+  }, [targetNonce, isTarget]);
+
+  // The finding's card only exists in the DOM once the accordion body (and
+  // FindingsPanel) has actually rendered, which happens on the render AFTER
+  // the effect above opens it — so this waits for `open`, not the nonce.
+  React.useEffect(() => {
+    if (!isTarget || !targetFindingId || !open) return;
+    const id = window.requestAnimationFrame(() => {
+      rootRef.current
+        ?.querySelector(`[data-finding-id="${CSS.escape(targetFindingId)}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isTarget, targetFindingId, targetNonce, open]);
+
   const del = useDeleteReview(prId);
   const findings = review.findings;
   const blockers = findings.filter((f) => f.severity === "CRITICAL" && !f.dismissed_at).length;
@@ -159,6 +190,9 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            severity={severityFilter}
+            onClearSeverity={() => setSeverityFilter(null)}
+            focusFindingId={isTarget ? targetFindingId : null}
           />
         </div>
       )}

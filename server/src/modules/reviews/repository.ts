@@ -87,6 +87,14 @@ export class ReviewRepository {
     return runRepo.latestRunCostByPr(this.db, workspaceId, prIds);
   }
 
+  /** Per-severity finding counts across each PR's reviews — the list's FINDINGS column. */
+  findingCountsByPr(
+    workspaceId: string,
+    prIds: string[],
+  ): Promise<Map<string, { CRITICAL: number; WARNING: number; SUGGESTION: number }>> {
+    return reviewRepo.findingCountsByPr(this.db, workspaceId, prIds);
+  }
+
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */
   deleteAgentRun(workspaceId: string, runId: string): Promise<boolean> {
     return runRepo.deleteAgentRun(this.db, workspaceId, runId);

@@ -3,8 +3,10 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummary, PrCommit, FindingRecord, Severity } from "@devdigest/shared";
 import { RunCostBadge } from "@/components/run-cost-badge";
+import { SeverityCounts, countBySeverity } from "@/components/severity-counts";
+import { FindingsPreview } from "@/components/findings-preview";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -85,19 +87,31 @@ function tsOf(s: string | null | undefined): number {
   return Number.isNaN(n) ? 0 : n;
 }
 
+/** Extra targeting passed alongside a run id when navigating to the review
+    accordion below: narrow to one severity, or scroll straight to one finding. */
+export interface GoToReviewOpts {
+  severity?: Severity;
+  findingId?: string;
+}
+
 export function RunHistory({
   runs,
   commits = [],
+  findingsByRun,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** This PR's findings, keyed by run id — when a run has an entry, its row
+      shows per-severity counters + a hover preview instead of plain text. */
+  findingsByRun?: Map<string, FindingRecord[]>;
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
-  /** Jump to this run's inline review accordion below (clicking the agent name). */
-  onGoToReview?: (runId: string) => void;
+  /** Jump to this run's inline review accordion below (clicking the agent name,
+      a severity counter, or a finding in its hover preview). */
+  onGoToReview?: (runId: string, opts?: GoToReviewOpts) => void;
   onDelete?: (runId: string) => void;
 }) {
   const t = useTranslations("prReview");
@@ -190,8 +204,22 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+                  {findingsByRun?.has(r.run_id) ? (
+                    <FindingsPreview
+                      scopedToRun
+                      findings={findingsByRun.get(r.run_id)}
+                      onSelect={(findingId) => onGoToReview?.(r.run_id, { findingId })}
+                    >
+                      <SeverityCounts
+                        counts={countBySeverity(findingsByRun.get(r.run_id)!)}
+                        onSelect={(severity) => onGoToReview?.(r.run_id, { severity })}
+                        size={12}
+                      />
+                    </FindingsPreview>
+                  ) : (
+                    t("runStatus.findings", { count: r.findings_count ?? 0 })
+                  )}
                   {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
                 </div>
               )}

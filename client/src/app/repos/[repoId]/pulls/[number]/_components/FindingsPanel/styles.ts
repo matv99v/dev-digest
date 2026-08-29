@@ -23,5 +23,23 @@ export const s = {
     fontSize: 13,
     color: "var(--text-secondary)",
   } satisfies CSSProperties,
+  severityNotice: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+  showAllButton: {
+    background: "none",
+    border: "none",
+    padding: 0,
+    font: "inherit",
+    fontWeight: 600,
+    color: "var(--accent-text)",
+    cursor: "pointer",
+    textDecoration: "underline",
+    textUnderlineOffset: 2,
+  } satisfies CSSProperties,
   list: { display: "flex", flexDirection: "column", gap: 12 } satisfies CSSProperties,
 } as const;

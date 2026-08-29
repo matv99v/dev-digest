@@ -7,6 +7,10 @@ import { useTranslations } from "next-intl";
 import { Icon, Avatar, Badge, CircularScore } from "@devdigest/ui";
 import type { PrMeta } from "@/lib/types";
 import { RunCostBadge } from "@/components/run-cost-badge";
+import { SeverityCounts } from "@/components/severity-counts";
+import { FindingsPreview } from "@/components/findings-preview";
+import { usePrReviews } from "@/lib/hooks/reviews";
+import { setPendingFinding } from "@/lib/finding-target";
 import { SIZE_COLOR, STATUS_META } from "../../constants";
 import { relativeTime, sizeOf } from "../../helpers";
 import { s } from "../../styles";
@@ -15,6 +19,14 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");
   const router = useRouter();
   const [h, setH] = React.useState(false);
+  // Findings are only fetched once the FINDINGS cell is hovered — the popover's
+  // data source, and disabled the rest of the time so the list stays cheap.
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const { data: reviews, isLoading: reviewsLoading } = usePrReviews(previewOpen ? pr.id : null);
+  const previewFindings = React.useMemo(
+    () => reviews?.flatMap((r) => r.findings),
+    [reviews],
+  );
   const st = STATUS_META[pr.status] ?? STATUS_META.needs_review!;
   const { size, lines } = sizeOf(pr);
   const reviewed = pr.score != null; // null score ⇒ PR has never been reviewed
@@ -53,6 +65,21 @@ export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
         ) : (
           <span style={s.muted}>—</span>
         )}
+      </div>
+      <div style={s.findingsCell}>
+        <FindingsPreview
+          findings={previewFindings}
+          loading={previewOpen && reviewsLoading}
+          onOpenChange={setPreviewOpen}
+          onSelect={(findingId) => {
+            // Handed over out-of-band so the address bar just reads the PR —
+            // see lib/finding-target.ts.
+            setPendingFinding(pr.number, findingId);
+            router.push(`/repos/${repoId}/pulls/${pr.number}?tab=findings`);
+          }}
+        >
+          <SeverityCounts counts={pr.findings_by_severity} />
+        </FindingsPreview>
       </div>
       <div>
         <Badge dot color={st.c} bg="transparent">

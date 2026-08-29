@@ -29,7 +29,14 @@
   "panel": {
     "hideLowConfidence": "Hide low confidence",
     "noMatchTitle": "No findings match",
-    "noMatchBody": "Adjust the filters above, or run a review to generate findings."
+    "noMatchBody": "Adjust the filters above, or run a review to generate findings.",
+    "filteredTo": "Showing only {severity}",
+    "showAll": "Show all"
+  },
+  "preview": {
+    "title": "{count} findings",
+    "titleInRun": "{count} findings in this run",
+    "loading": "Loading findings…"
   },
   "runReview": {
     "runAll": "Run all enabled agents",
@@ -91,6 +98,7 @@
       "author": "Author",
       "size": "Size",
       "score": "Score",
+      "findings": "Findings",
       "status": "Status",
       "cost": "Cost",
       "updated": "Updated"

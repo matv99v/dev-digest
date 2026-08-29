@@ -54,6 +54,37 @@ export async function insertFindings(
   return rows;
 }
 
+/** Per-severity finding counts across ALL of each PR's reviews (list endpoint's
+ *  FINDINGS column) — one IN-query + JS grouping, same shape as the list's score
+ *  lookup above it in routes.ts. Zero-filled per severity so the UI never has to
+ *  guard a missing key; unknown severities (there shouldn't be any) are ignored. */
+export async function findingCountsByPr(
+  db: Db,
+  workspaceId: string,
+  prIds: string[],
+): Promise<Map<string, { CRITICAL: number; WARNING: number; SUGGESTION: number }>> {
+  const byPr = new Map<string, { CRITICAL: number; WARNING: number; SUGGESTION: number }>();
+  if (prIds.length === 0) return byPr;
+  const rows = await db
+    .select({ prId: t.reviews.prId, severity: t.findings.severity })
+    .from(t.findings)
+    .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+    .where(
+      and(
+        eq(t.reviews.workspaceId, workspaceId),
+        inArray(t.reviews.prId, prIds),
+        eq(t.reviews.kind, 'review'),
+      ),
+    );
+  for (const r of rows) {
+    if (r.severity !== 'CRITICAL' && r.severity !== 'WARNING' && r.severity !== 'SUGGESTION') continue;
+    const counts = byPr.get(r.prId) ?? { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 };
+    counts[r.severity]++;
+    byPr.set(r.prId, counts);
+  }
+  return byPr;
+}
+
 /** Reviews for a PR (newest first), each with its findings. */
 export async function reviewsForPull(
   db: Db,

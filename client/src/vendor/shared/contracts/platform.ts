@@ -173,6 +173,11 @@ export const PrMeta = z.object({
   // Latest priced run's USD cost (list endpoint only; null/absent when no run
   // on this PR has a stored cost). The UI renders '—' for that, never '$0.00'.
   cost_usd: z.number().nullish(),
+  // Per-severity finding counts across the PR's reviews (list endpoint only;
+  // absent until reviewed). The UI renders '—' for an all-zero PR.
+  findings_by_severity: z
+    .object({ CRITICAL: z.number().int(), WARNING: z.number().int(), SUGGESTION: z.number().int() })
+    .nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 

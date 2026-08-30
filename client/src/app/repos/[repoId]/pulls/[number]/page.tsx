@@ -21,6 +21,7 @@ import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } 
 import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
 import { ApiError } from "../../../../../lib/api";
 import { githubPrUrl } from "../../../../../lib/github-urls";
+import { useHandoffFinding } from "../../../../../lib/finding-target";
 import type { FindingRecord } from "@devdigest/shared";
 
 export default function PRDetailPage() {
@@ -59,6 +60,14 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
+
+  // "Scroll to this finding", from two sources: the out-of-band handoff a
+  // findings hover preview on the PR list leaves behind (which keeps the URL
+  // clean), or an explicit ?finding= someone pasted — that one stays in the
+  // URL, since a shared link should keep working on reload. Read in an effect
+  // because the module slot is client-only and must not skew hydration.
+  const deepLinkFindingId = useHandoffFinding(number) ?? search.get("finding");
+
   const setParam = (key: string, val: string | null) => {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
@@ -148,6 +157,7 @@ export default function PRDetailPage() {
             repoFullName={repoFullName}
             headSha={pr.head_sha}
             cancelMutation={cancel}
+            deepLinkFindingId={deepLinkFindingId}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
               if (window.confirm("Delete this run from history? (its logs are removed too)"))

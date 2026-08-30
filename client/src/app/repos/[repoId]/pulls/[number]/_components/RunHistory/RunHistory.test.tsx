@@ -4,10 +4,10 @@
  * a settled run is colored/labelled by its denormalized blocker/finding counts,
  * and shows the review score ring.
  */
-import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { RunSummary, FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
@@ -35,10 +35,38 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function finding(o: Partial<FindingRecord>): FindingRecord {
+  return {
+    id: "f1",
+    severity: "CRITICAL",
+    category: "security",
+    title: "t",
+    file: "a.ts",
+    start_line: 1,
+    end_line: 1,
+    rationale: "r",
+    suggestion: null,
+    confidence: 0.9,
+    kind: "finding",
+    trifecta_components: null,
+    evidence: null,
+    review_id: "r1",
+    accepted_at: null,
+    dismissed_at: null,
+    ...o,
+  };
+}
+
+function renderRuns(
+  runs: RunSummary[],
+  extra?: {
+    findingsByRun?: Map<string, FindingRecord[]>;
+    onGoToReview?: (runId: string, opts?: { severity?: string; findingId?: string }) => void;
+  },
+) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} onOpenTrace={() => {}} {...extra} />
     </NextIntlClientProvider>,
   );
 }
@@ -94,5 +122,40 @@ describe("RunHistory — cost badge", () => {
     renderRuns([run({ status: "running", cost_usd: null, score: null, blockers: null })]);
     expect(screen.queryByText(/tok$/)).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — severity counters", () => {
+  it("a settled run WITH a findingsByRun entry shows counters instead of plain text", () => {
+    const findingsByRun = new Map([
+      ["run-1", [finding({ id: "f1", severity: "CRITICAL" }), finding({ id: "f2", severity: "WARNING" })]],
+    ]);
+    renderRuns([run({ status: "done", findings_count: 2, blockers: 1, score: 40 })], { findingsByRun });
+    expect(screen.getByLabelText("1 Critical")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 Warning")).toBeInTheDocument();
+    expect(screen.queryByText("2 finding(s)")).not.toBeInTheDocument();
+    expect(screen.getByText(/1 blocker/)).toBeInTheDocument();
+  });
+
+  it("a settled run with NO findingsByRun entry keeps the plain-text fallback", () => {
+    renderRuns([run({ status: "done", findings_count: 3, blockers: 0, score: 72 })]);
+    expect(screen.getByText("3 finding(s)")).toBeInTheDocument();
+  });
+
+  it("clicking a severity counter calls onGoToReview with the run id + severity", () => {
+    const findingsByRun = new Map([["run-1", [finding({ severity: "CRITICAL" })]]]);
+    const onGoToReview = vi.fn();
+    renderRuns([run({ status: "done", score: 40 })], { findingsByRun, onGoToReview });
+    fireEvent.click(screen.getByLabelText("1 Critical"));
+    expect(onGoToReview).toHaveBeenCalledWith("run-1", { severity: "CRITICAL" });
+  });
+
+  it("clicking a finding in the hover preview calls onGoToReview with the finding id", () => {
+    const findingsByRun = new Map([["run-1", [finding({ id: "f-critical", severity: "CRITICAL", title: "Hardcoded secret" })]]]);
+    const onGoToReview = vi.fn();
+    renderRuns([run({ status: "done", score: 40 })], { findingsByRun, onGoToReview });
+    fireEvent.mouseEnter(screen.getByLabelText("1 Critical").parentElement!.parentElement!);
+    fireEvent.click(screen.getByText("Hardcoded secret"));
+    expect(onGoToReview).toHaveBeenCalledWith("run-1", { findingId: "f-critical" });
   });
 });

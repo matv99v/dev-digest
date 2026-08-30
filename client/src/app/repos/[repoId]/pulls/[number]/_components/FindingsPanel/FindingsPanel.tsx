@@ -4,8 +4,8 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Toggle, EmptyState } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import { Toggle, EmptyState, SEV } from "@devdigest/ui";
+import type { FindingRecord, Severity } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { useFindingAction } from "../../../../../../../lib/hooks/reviews";
 import { KEY_TO_ACTION } from "./constants";
@@ -17,18 +17,40 @@ export function FindingsPanel({
   prId,
   repoFullName,
   headSha,
+  severity = null,
+  onClearSeverity,
+  focusFindingId = null,
 }: {
   findings: FindingRecord[];
   prId: string;
   repoFullName?: string | null;
   headSha?: string | null;
+  /** Narrows the list to one severity — set by clicking a severity counter in
+      the Timeline above. The only way to clear it is clicking it again there,
+      or the "Show all" button this renders when set. */
+  severity?: Severity | null;
+  onClearSeverity?: () => void;
+  /** A finding picked from a hover preview — expanded and scrolled to (by the
+      accordion) on mount, and seeds j/k navigation from its position. */
+  focusFindingId?: string | null;
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
   const [focusIdx, setFocusIdx] = React.useState(0);
 
-  const shown = React.useMemo(() => visibleFindings(findings, hideLow), [findings, hideLow]);
+  const shown = React.useMemo(
+    () => visibleFindings(findings, hideLow, severity),
+    [findings, hideLow, severity],
+  );
+
+  // A deep-linked finding seeds keyboard nav from its position in the list.
+  React.useEffect(() => {
+    if (!focusFindingId) return;
+    const idx = shown.findIndex((f) => f.id === focusFindingId);
+    if (idx >= 0) setFocusIdx(idx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusFindingId]);
 
   // j/k navigation + a/d shortcuts on the focused finding (keyboard).
   React.useEffect(() => {
@@ -48,6 +70,14 @@ export function FindingsPanel({
   return (
     <div>
       <div style={s.toolbar}>
+        {severity && (
+          <div style={s.severityNotice}>
+            {t("panel.filteredTo", { severity: SEV[severity].label })}
+            <button type="button" onClick={onClearSeverity} style={s.showAllButton}>
+              {t("panel.showAll")}
+            </button>
+          </div>
+        )}
         <div style={s.toggleGroup}>
           {t("panel.hideLowConfidence")}
           <Toggle on={hideLow} onChange={setHideLow} size={16} />
@@ -63,7 +93,7 @@ export function FindingsPanel({
               key={f.id}
               f={f}
               focused={i === focusIdx}
-              defaultExpanded={i === 0}
+              defaultExpanded={f.id === focusFindingId || i === 0}
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}

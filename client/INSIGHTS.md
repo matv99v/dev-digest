@@ -5,7 +5,7 @@ Lessons learned working in `@devdigest/web`. Append with `/engineering-insights`
 entry that supersedes it. If a finding also concerns another module, write that module's
 half in its own `INSIGHTS.md`. The root file is for root config and CI only.
 
-When an entry has bitten twice, promote its **Rule** into `CLAUDE.md` and leave the cause
+When an entry has bitten twice, promote its **Rule** into `AGENTS.md` and leave the cause
 here. Architectural decisions with reasoning belong in `docs/`, not here. Prune
 quarterly; past ~30 entries, split by domain.
 

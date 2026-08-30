@@ -29,7 +29,7 @@ Never record:
 
 - generic programming knowledge ("promises can be tricky")
 - a one-time issue unlikely to recur
-- anything already in `README.md`, `TESTING.md`, `CLAUDE.md`, or `docs/`
+- anything already in `README.md`, `TESTING.md`, `AGENTS.md`, or `docs/`
 - anything that needs paragraphs to explain — that is a `docs/` note, not an insight
 
 If no candidate passes, say so plainly and stop. Do not open a file.
@@ -80,7 +80,7 @@ reading both before writing either.
 - **An equivalent entry already exists** → stop. Write nothing. Say which entry covers it.
 - **One file already carries its half, the other doesn't** → write only the missing one.
 - **A related entry exists and this session confirms it a second time** → promote its
-  `Rule` into that package's `CLAUDE.md`, and leave the entry here untouched.
+  `Rule` into that package's `AGENTS.md`, and leave the entry here untouched.
 - **Nothing similar** → continue.
 
 ## Step 5 — Choose the section
@@ -188,7 +188,7 @@ knows what to do.
 ## Maintenance
 
 - Newest entry first inside its section.
-- When an entry has bitten twice, promote its `Rule` into that package's `CLAUDE.md` and
+- When an entry has bitten twice, promote its `Rule` into that package's `AGENTS.md` and
   leave the cause here.
 - Prune quarterly: drop entries for bugs since fixed, duplicates, and anything never
   needed again. Past roughly 30 entries in one file, split it by domain.

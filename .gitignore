@@ -24,5 +24,5 @@ test-results/
 # emdash worktree config (local)
 .emdash.json
 
-# personal Claude Code instructions, loaded alongside CLAUDE.md
+# personal Claude Code instructions, loaded alongside AGENTS.md
 CLAUDE.local.md

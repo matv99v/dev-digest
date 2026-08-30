@@ -9,7 +9,7 @@ concerns, each file stating the part that matters there, even when that means tw
 Append with `/engineering-insights`. **Never rewrite or delete an entry** — correct an
 outdated one by adding a newer dated entry that supersedes it.
 
-When an entry has bitten twice, promote its **Rule** into `CLAUDE.md` and leave the cause
+When an entry has bitten twice, promote its **Rule** into `AGENTS.md` and leave the cause
 here. Architectural decisions with reasoning belong in `docs/`, not here. Prune
 quarterly; past ~30 entries, split by domain.
 

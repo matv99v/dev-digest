@@ -10,7 +10,7 @@ Anything scoped to a single package goes in that package's `docs/` instead.
 | Surface | Holds |
 |---|---|
 | `README.md` | What the project is and how it fits together — architecture, diagrams, routes. The source of truth |
-| `CLAUDE.md` | Commands, package manager, do-not-touch, gotchas, pointers. Loaded every session, so kept short |
+| `AGENTS.md` | Commands, package manager, do-not-touch, gotchas, pointers. Loaded every session, so kept short |
 | `INSIGHTS.md` | Lessons learned the hard way — cause + rule |
 | `docs/` | Design notes and ADRs — the reasoning behind a decision |
 | `specs/` | A spec per feature, written before it is built |

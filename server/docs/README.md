@@ -11,7 +11,7 @@ and `../src/modules/repo-intel/README.md` owns the indexer.
 
 ## Neighbours
 
-- `../CLAUDE.md` — commands, gotchas, do-not-touch (loaded every session)
+- `../AGENTS.md` — commands, gotchas, do-not-touch (loaded every session)
 - `../INSIGHTS.md` — lessons learned: cause + rule
 - `../specs/` — a spec per feature, written before it is built
 

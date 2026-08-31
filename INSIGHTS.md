@@ -22,19 +22,72 @@ quarterly; past ~30 entries, split by domain.
 
 ## What Works
 
-_No entries yet._
+### 2026-08-31 — A parallel checkout at `../orig-dev-digest` holds reference versions of this repo's skills
+**Cause:** `pr-self-review` was designed here from scratch while a working 359-line
+implementation already sat one directory over, on branch `lesson-2-lab/skills`. It had to be
+pointed out.
+**Rule:** before designing a skill or workflow here, look in `../orig-dev-digest/.claude/skills/`
+and diff against what is there. **Adapt, never copy** — that checkout's skill map routes to
+`vercel-react-best-practices`, `nodejs-best-practices` and two subagents that exist in neither
+tree, and its `CRITICAL/HIGH/MEDIUM` scale contradicts the product's own enum in
+`server/src/vendor/shared/contracts/findings.ts`. Verify every skill named in a routing table
+against `.claude/skills/`; a route to a skill that is not installed silently reviews less than
+it claims.
+**Evidence:** `../orig-dev-digest/.claude/skills/pr-self-review/gate.md`,
+`.claude/skills/pr-self-review/README.md:31-52`.
 
 ## What Doesn't Work
 
-_No entries yet._
+### 2026-08-31 — A ranking step nothing consumes is decorative, and it is where a dropped limit hides
+**Cause:** `engineering-insights` ranked candidate findings four deep, then never said how
+many to write. The ranking ordered nothing, because every candidate survived it. An earlier
+rewrite had dropped the "≤5 candidates" cap that used to consume that order, and the
+ranking's presence concealed the loss — the file still read as though it controlled volume.
+**Rule:** every ordering or scoring step in a skill needs a later step that reads it ("write
+at most two, from the top of that list"), otherwise it is prose. When reviewing a rewritten
+skill, trace each step's output to the step that consumes it; a step nothing consumes is the
+usual hiding place for a constraint that was removed.
+**Evidence:** `.claude/skills/engineering-insights/SKILL.md:54-57`.
+
+### 2026-08-31 — An untracked state file that feeds a diff hash invalidates itself the moment it is written
+**Cause:** `diff-hash.sh` folds untracked file *contents* into the hash, so that a brand-new
+file invalidates a stale review. `.pr-self-review.json` was itself untracked, so it landed in
+its own hash: writing the receipt changed the value the receipt had just recorded, and the gate
+reported "your changes moved since the last review" on a review one second old. It reads as a
+hashing bug; it is a scoping one.
+**Rule:** any per-developer state file consumed by `diff-hash.sh` must be in `.gitignore`
+**before** the first run — otherwise no PASS can ever match and the gate blocks unconditionally.
+The `.gitignore` entry carries this reason inline so it is not "tidied away" later.
+**Evidence:** `.claude/skills/pr-self-review/scripts/diff-hash.sh:15-20`, `.gitignore:30-33`.
 
 ## Codebase Patterns
 
-_No entries yet._
+### 2026-08-31 — A skill's `description` is its entire trigger, and it under-covers its own body silently
+**Cause:** `engineering-insights` had seven sections in its body but a `description` naming
+four kinds of finding. `What Works`, `Codebase Patterns` and `Open Questions` were
+unreachable — a session that only surfaced a convention, or only left an open question, never
+invoked the skill, and nothing looked wrong from inside the file. The gap is visible only by
+diffing the trigger clauses against the body; reviewing either half on its own misses it.
+**Rule:** after editing any `SKILL.md`, map the `description`'s trigger clauses 1:1 onto the
+branches the body handles — its sections, its routing rows, its ranked categories. Every
+branch the body can handle needs a phrase that reaches it, and literal user phrasings ("wrap
+up", "retro") belong in the text rather than left to paraphrase matching. Editing the body is
+exactly when the `description` goes stale, because the body is what you are looking at.
+**Evidence:** `.claude/skills/engineering-insights/SKILL.md:3` against its Step 5 table at
+`.claude/skills/engineering-insights/SKILL.md:117`.
 
 ## Tool & Library Notes
 
-_No entries yet._
+### 2026-08-31 — A `PreToolUse` Bash hook that substring-matches the command fires on any command that merely mentions it
+**Cause:** the gate matched `case "$cmd" in *"git push"*)`. The Bash tool hands the hook the
+*whole* command string, heredoc bodies included, so writing a file whose **content** contained
+those words was denied as though it were a push. The skill's own README tripped its own gate.
+**Rule:** match at command position, never by substring — strip heredoc bodies and `#` comment
+lines first, then require the verb after a segment boundary (`^`, `;`, `&&`, `||`, `|`,
+newline), allowing env assignments and flags like `git -C dir`. Test the negatives (a heredoc
+mentioning it, a `grep` for the literal, an `echo`), not just the positives; a matcher that
+only ever sees real invocations looks correct right up until someone documents it.
+**Evidence:** `.claude/skills/pr-self-review/scripts/check-gate.sh:40-63`.
 
 ## Recurring Errors & Fixes
 

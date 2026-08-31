@@ -26,6 +26,19 @@ _No entries yet._
 
 ## Codebase Patterns
 
+### 2026-08-31 — The server's vendored contract copy runs ahead of the client's; four pairs differ right now
+**Cause:** `src/vendor/shared/contracts/` and `client/src/vendor/shared/contracts/` are two
+copies of the same contracts kept in sync by a regeneration step, and the server side is where
+new work lands first. Today `eval-ci.ts`, `knowledge.ts`, `productionize.ts` and `trace.ts` all
+differ — the server has an `openrouter` provider and an `AgentManifest` the client has never
+seen.
+**Rule:** changing a contract here is not done until the client copy is regenerated; treat the
+client half as part of the same change. And when tooling compares the two copies, scope it to
+the contracts the diff actually touches — a whole-tree comparison reports these four
+pre-existing pairs on every run and drowns the real drift.
+**Evidence:** `src/vendor/shared/contracts/productionize.ts:36` (`openrouter` present) vs the
+client's `:36` (absent); `src/vendor/shared/contracts/eval-ci.ts:145` (`AgentManifest`).
+
 ### 2026-08-29 — A new field on the RunTrace document must be `.nullish()`, never `.nullable()`
 **Cause:** `run_traces` stores the whole trace as ONE jsonb document, and old rows are
 never migrated — so a trace written before a field existed has no such key at all, not a

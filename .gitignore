@@ -26,3 +26,9 @@ test-results/
 
 # personal Claude Code instructions, loaded alongside AGENTS.md
 CLAUDE.local.md
+
+# pr-self-review local state (per-dev). MUST stay ignored: the file is untracked, so if it
+# were visible to `git ls-files --others` it would feed its own diff hash and no PASS could
+# ever match on the next run.
+.pr-self-review.json
+.claude/skills/*-workspace/

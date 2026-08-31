@@ -1,7 +1,7 @@
 /* atoms — trivial presentational layout helpers shared by the trace body
    (Stat tile, labelled Row). Grouped in one file: no logic, never tested alone. */
 import React from "react";
-import { s } from "../styles";
+import { s } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/styles";
 
 export function Stat({ label, val }: { label: string; val: React.ReactNode }) {
   return (

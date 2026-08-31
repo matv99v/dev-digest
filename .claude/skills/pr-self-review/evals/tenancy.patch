@@ -1,0 +1,35 @@
+diff --git a/server/src/modules/repos/routes.ts b/server/src/modules/repos/routes.ts
+index fff6af2..721805c 100644
+--- a/server/src/modules/repos/routes.ts
++++ b/server/src/modules/repos/routes.ts
+@@ -1,8 +1,10 @@
+ import type { FastifyInstance } from 'fastify';
+ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
++import { eq } from 'drizzle-orm';
+ import { RepoInput } from '@devdigest/shared';
+ import { getContext } from '../_shared/context.js';
+ import { IdParams } from '../_shared/schemas.js';
++import * as t from '../../db/schema.js';
+ import { RepoService } from './service.js';
+ 
+ /**
+@@ -40,6 +42,19 @@ export default async function reposRoutes(appBase: FastifyInstance) {
+     return service.refresh(workspaceId, req.params.id);
+   });
+ 
++  // Quick endpoint for the settings page - returns the repo's polling config.
++  app.get('/repos/:id/polling', { schema: { params: IdParams } }, async (req, reply) => {
++    await getContext(app.container, req);
++
++    const [row] = await app.container.db
++      .select()
++      .from(t.repos)
++      .where(eq(t.repos.id, req.params.id));
++
++    if (!row) return reply.code(404).send({ error: 'not found' });
++    return reply.send({ pollIntervalMinutes: row.pollIntervalMinutes });
++  });
++
+   app.delete('/repos/:id', { schema: { params: IdParams } }, async (req) => {
+     const { workspaceId } = await getContext(app.container, req);
+     await service.remove(workspaceId, req.params.id);

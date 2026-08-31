@@ -7,14 +7,14 @@ import { useTranslations } from "next-intl";
 import { Badge } from "@devdigest/ui";
 import type { RunTrace, FindingRecord } from "@devdigest/shared";
 import { formatCostUsd } from "@/components/run-cost-badge";
-import { PROMPT_COLORS } from "../../constants";
-import { formatSeconds, formatTokens } from "../../helpers";
-import { s } from "../../styles";
-import { TraceSection } from "../TraceSection";
-import { ToolCallRow } from "../ToolCallRow";
-import { PromptBlock } from "../PromptBlock";
-import { FindingsSection } from "../FindingsSection";
-import { Row, Stat } from "../atoms";
+import { PROMPT_COLORS } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/constants";
+import { formatSeconds, formatTokens } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/helpers";
+import { s } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/styles";
+import { TraceSection } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceSection";
+import { ToolCallRow } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/ToolCallRow";
+import { PromptBlock } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/PromptBlock";
+import { FindingsSection } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/FindingsSection";
+import { Row, Stat } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/atoms";
 
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
   const t = useTranslations("runs");

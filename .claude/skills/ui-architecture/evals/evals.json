@@ -1,0 +1,26 @@
+{
+  "skill_name": "ui-architecture",
+  "evals": [
+    {
+      "id": 0,
+      "name": "new-page-placement",
+      "prompt": "додай сторінку /repos/[repoId]/insights — таблиця останніх review-ранів по репо з фільтром по статусу. дані бери з апі, ендпоінт GET /repos/:id/insights повертає масив { id, status, createdAt, durationMs, findingsCount }. зроби це в client/",
+      "expected_output": "Thin page.tsx under src/app/repos/[repoId]/insights/ that renders one view component; the view in _components/<Name>/ with Component.tsx, index.ts, styles.ts and a colocated .test.tsx; pure filter logic in helpers.ts; the endpoint added to src/lib/api.ts and wrapped in a src/lib/hooks/ hook rather than fetched from the component; imports aliased with @/ when leaving the folder.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "shared-promotion",
+      "prompt": "у мене вже є StatusBadge в src/app/repos/[repoId]/pulls/_components/StatusBadge/ — тепер такий самий бейдж потрібен на сторінці /agents. зроби щоб він був і там",
+      "expected_output": "The component is promoted to src/components/status-badge/ (kebab-case folder, PascalCase file, curated index.ts) and the original under pulls/_components/ is DELETED, not copied. Both routes import it via @/components/status-badge. Exactly one definition of the badge remains in the tree.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "review-misplaced-code",
+      "prompt": "глянь цей діф перед мержем і скажи що не так — щось мені не подобається як воно розкладено. (діф у файлі diff.patch)",
+      "expected_output": "Identifies all four planted problems: (1) fetch() called directly in a component instead of going through src/lib/api.ts + a src/lib/hooks/ hook; (2) a new global src/constants/ directory instead of a folder-local constants.ts; (3) export * in a new index.ts instead of named exports; (4) a six-level relative import that should be @/lib/....",
+      "files": ["diff.patch"]
+    }
+  ]
+}

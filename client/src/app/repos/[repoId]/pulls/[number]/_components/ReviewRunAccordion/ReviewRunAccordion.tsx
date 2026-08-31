@@ -8,9 +8,9 @@
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
 import type { ReviewRecord, RunSummary, Verdict, Severity } from "@devdigest/shared";
-import { FindingsPanel } from "../FindingsPanel";
-import { VerdictBanner } from "../VerdictBanner";
-import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
+import { FindingsPanel } from "@/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel";
+import { VerdictBanner } from "@/app/repos/[repoId]/pulls/[number]/_components/VerdictBanner";
+import { useDeleteReview } from "@/lib/hooks/reviews";
 
 const VERDICT_COLOR: Record<string, string> = {
   request_changes: "var(--crit)",

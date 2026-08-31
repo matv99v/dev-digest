@@ -5,8 +5,8 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Button, Icon, Modal } from "@devdigest/ui";
-import { s } from "../../styles";
-import { PromptModalBody } from "../PromptModalBody";
+import { s } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/styles";
+import { PromptModalBody } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/PromptModalBody";
 
 const miniBtnStyle: React.CSSProperties = {
   display: "inline-flex",

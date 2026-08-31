@@ -1,0 +1,47 @@
+{
+  "skill_name": "pr-self-review",
+  "evals": [
+    {
+      "id": 0,
+      "name": "frontend-only-routing",
+      "prompt": "зроби self-review моїх змін перед тим як я відкрию PR. я чіпав тільки client/ — додав нову сторінку і компонент до неї",
+      "expected_output": "Dispatches only the UI bucket (ui-architecture, react-best-practices, next-best-practices) plus the always-on full-stack pass (typescript-expert, zod, security). onion-architecture, fastify-best-practices, drizzle-orm-patterns and postgresql-table-design must NOT appear — no server/ file changed. Runs client typecheck + `pnpm test` first, before any LLM pass. Writes .pr-self-review.json with a verdict and a diffHash from scripts/diff-hash.sh.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "backend-critical-tenancy",
+      "prompt": "перевір мої зміни перед PR (діф у файлі tenancy.patch)",
+      "expected_output": "Flags the Drizzle query added to the route handler that has no workspaceId filter as CRITICAL — it is in the closed catalogue (a query not scoped by workspaceId leaks across workspaces and still compiles). Verdict BLOCKED, criticalCount 1, and the report names the fix (move the query into a repository, scope it by workspaceId). The CRITICAL survives the adversarial verification pass because the missing filter is on an added line.",
+      "files": ["tenancy.patch"]
+    },
+    {
+      "id": 2,
+      "name": "pre-existing-violation-noise",
+      "prompt": "гляну перед пушем — я поміняв один рядок в server/src/modules/pulls/routes.ts, просто текст в лозі",
+      "expected_output": "Reports nothing critical. server/src/modules/pulls/routes.ts is in onion-architecture's known-violations table (drizzle-orm at :3, container.db at :28, container.github() at :36, the N+1 backfill at :89-96), but none of that is on a line the diff touches, so none of it may be reported. Verdict PASS. This is the case where an over-eager gate becomes noise and gets switched off.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "severity-inflation",
+      "prompt": "self-review перед PR будь ласка (діф у файлі cosmetic.patch)",
+      "expected_output": "Returns only WARNING/SUGGESTION findings — naming, a slightly long function, a missing comment. Nothing reaches CRITICAL because nothing matches the closed catalogue. Verdict `comment`, PASS, the push is allowed. Speculative phrasing (\"might be\", \"if not already handled\") must be capped at WARNING rather than promoted.",
+      "files": ["cosmetic.patch"]
+    },
+    {
+      "id": 4,
+      "name": "contract-drift-scoping",
+      "prompt": "перевір зміни перед PR — я додав поле в server/src/vendor/shared/contracts/review-api.ts",
+      "expected_output": "Reports exactly ONE contract-drift CRITICAL, for review-api.ts (touched in the server copy, not mirrored in client/src/vendor/shared/contracts/review-api.ts). Must NOT report eval-ci.ts, knowledge.ts, productionize.ts or trace.ts — those four pairs already differ in the tree but the diff does not touch them. Says the fix is the regeneration step, not hand-patching one side.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "typecheck-shortcircuit",
+      "prompt": "зроби ревʼю моїх змін перед PR (діф у файлі type-error.patch)",
+      "expected_output": "Stops at the deterministic gate: client (or server) typecheck exits non-zero, the run reports BLOCKED naming which gate failed, and spawns NO review subagents at all. The point is that a tree which does not compile should never reach the LLM passes — the architecture findings would just be symptoms of the type error.",
+      "files": ["type-error.patch"]
+    }
+  ]
+}

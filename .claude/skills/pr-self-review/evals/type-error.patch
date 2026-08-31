@@ -1,0 +1,14 @@
+diff --git a/client/src/lib/github-urls.ts b/client/src/lib/github-urls.ts
+index 2efb94e..9beabf1 100644
+--- a/client/src/lib/github-urls.ts
++++ b/client/src/lib/github-urls.ts
+@@ -14,7 +14,8 @@ function encPath(file: string): string {
+ 
+ /** https://github.com/{owner}/{repo}/pull/{number} */
+ export function githubPrUrl(repoFullName: string, number: number): string {
+-  return `${HOST}/${repoFullName}/pull/${number}`;
++  // declared `: string`, returns a number - typecheck must fail here
++  return number * 2;
+ }
+ 
+ /**

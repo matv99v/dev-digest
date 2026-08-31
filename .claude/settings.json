@@ -5,5 +5,18 @@
       "Read(./**/.next/**)",
       "Read(./**/dist/**)"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/skills/pr-self-review/scripts/check-gate.sh"
+          }
+        ]
+      }
+    ]
   }
 }

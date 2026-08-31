@@ -6,8 +6,8 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
-import { s } from "../../styles";
-import { TraceSection } from "../TraceSection";
+import { s } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/styles";
+import { TraceSection } from "@/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceSection";
 
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: "var(--crit)",

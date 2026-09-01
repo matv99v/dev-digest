@@ -9,6 +9,8 @@ export function EmptyState({
   cta,
   onCta,
   ctaLoading,
+  ctaKind = "secondary",
+  secondary,
 }: {
   icon?: IconName;
   title: string;
@@ -16,6 +18,12 @@ export function EmptyState({
   cta?: string;
   onCta?: () => void;
   ctaLoading?: boolean;
+  /** Defaults to "secondary" (unchanged look for every existing caller);
+      pass "primary" where the design calls for a solid CTA. */
+  ctaKind?: "primary" | "secondary";
+  /** Optional second action next to the primary CTA (e.g. a "Start from
+      template" dropdown) — the caller builds it, this just lays it out. */
+  secondary?: React.ReactNode;
 }) {
   const I = icon ? Icon[icon] : null;
   return (
@@ -53,11 +61,14 @@ export function EmptyState({
           {body}
         </div>
       )}
-      {cta && (
-        <div style={{ marginTop: 12 }}>
-          <Button kind="secondary" icon="Plus" onClick={onCta} loading={ctaLoading}>
-            {cta}
-          </Button>
+      {(cta || secondary) && (
+        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center" }}>
+          {cta && (
+            <Button kind={ctaKind} icon="Plus" onClick={onCta} loading={ctaLoading}>
+              {cta}
+            </Button>
+          )}
+          {secondary}
         </div>
       )}
     </div>

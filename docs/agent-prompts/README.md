@@ -9,6 +9,7 @@ in the DB). The canonical, reviewable copies live next to this file:
 - [`general-reviewer.md`](./general-reviewer.md)
 - [`security-reviewer.md`](./security-reviewer.md)
 - [`performance-reviewer.md`](./performance-reviewer.md)
+- [`test-quality-reviewer.md`](./test-quality-reviewer.md)
 
 > The DB is the source of truth at run time. These files are the human-readable
 > originals — when you change a prompt, edit the file here **and** push it to the
@@ -49,6 +50,15 @@ delimiter-wrapped (`prompt.ts:104-122`):
 Sections with no content are omitted. Everything repo- or author-derived is wrapped
 in `<untrusted source="…">…</untrusted>` so the model can tell instructions
 (system) from data (user).
+
+**Skills follow the same split, by `source`.** A skill you (the workspace owner)
+wrote — `source: manual` or `extracted` — is injected into `## Skills / rules` raw,
+same as your own system prompt: you wrote it, it is trusted. A skill that came from
+outside the workspace — `source: imported_url` or `community` — is a stranger's
+instructions, so it is delimiter-wrapped exactly like the diff or the PR description
+(`<untrusted source="skill:name">…</untrusted>`), and `INJECTION_GUARD` then treats
+it as data to analyze rather than something that can redirect the review. Imported
+skills also save disabled until a human vets and enables them.
 
 ## The output schema is NOT in the prompt
 

@@ -9,6 +9,7 @@ import { useTheme } from "@/lib/theme";
 import { useActiveRepo } from "@/lib/repo-context";
 import { usePulls, useDeleteRepo } from "@/lib/hooks";
 import { activeKeyFor, toShellRepo } from "@/components/app-shell/helpers";
+import { APP_NAV } from "@/components/app-shell/nav";
 
 interface ShellContextOptions {
   onOpenCommandPalette: () => void;
@@ -60,6 +61,7 @@ export function useShellContext({ onOpenCommandPalette }: ShellContextOptions): 
   return React.useMemo<ShellContext>(
     () => ({
       Link,
+      nav: APP_NAV,
       activeKey: activeKeyFor(pathname),
       repoId,
       repos: repos.map(toShellRepo),

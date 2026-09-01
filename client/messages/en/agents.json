@@ -1,7 +1,10 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills"
+    "skillCount": "{count} skills",
+    "runs": "{count} runs",
+    "accept": "{rate} accept",
+    "avgCost": "{cost} avg"
   },
   "list": {
     "breadcrumbLab": "Skills Lab",
@@ -14,7 +17,8 @@
     "loadError": "Could not load agents.",
     "emptyTitle": "No agents yet",
     "emptyBody": "An agent is a configured reviewer — a model, a prompt, and the skills it uses. Create one to start reviewing.",
-    "emptyCta": "Create your first agent"
+    "emptyCta": "Create your first agent",
+    "startFromTemplate": "Start from template"
   },
   "create": {
     "title": "Create agent",
@@ -62,7 +66,7 @@
     "modelEmptyHint": "No models loaded — set the {provider} API key in Settings → API Keys.",
     "modelSearch": "Search models…",
     "systemPrompt": "System prompt",
-    "systemPromptHint": "Loaded as the static system message. Enabled skills are appended below it.",
+    "systemPromptHint": "Loaded as the static system message. Enabled skills are appended as their own section of the review task, in the Skills tab's order.",
     "outputSchema": "Output schema",
     "outputSchemaOption": "Standard findings JSON",
     "strategy": "Review strategy",
@@ -91,9 +95,37 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Drag to reorder.",
+    "noMatches": "No skills match your filter.",
+    "emptyTitle": "No skills yet",
+    "emptyBody": "Create a skill to attach it to this agent.",
+    "emptyCta": "Go to Skills"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
+  },
+  "stats": {
+    "totalRuns": "Total runs (30d)",
+    "avgCostRun": "Avg cost / run",
+    "avgDuration": "Avg duration",
+    "acceptRate": "Accept rate",
+    "acceptRateUnknown": "—",
+    "findingsBySeverity": "Findings by severity",
+    "findingsByCategory": "Findings by category",
+    "noFindings": "No findings in the last 30 days.",
+    "runHistory": "Run history",
+    "table": {
+      "timestamp": "Timestamp",
+      "pr": "PR",
+      "tokens": "Tokens",
+      "cost": "Cost",
+      "findings": "Findings",
+      "source": "Source",
+      "viewTrace": "View trace"
+    },
+    "empty": {
+      "title": "No agent runs yet",
+      "body": "Run a review with this agent to populate its stats."
+    }
   }
 }

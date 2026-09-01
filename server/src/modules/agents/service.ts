@@ -2,6 +2,8 @@ import type { Container } from '../../platform/container.js';
 import type {
   Agent,
   AgentSkillLink,
+  AgentStatsDetail,
+  AgentStatsSummary,
   AgentVersion,
   CiFailOn,
   ModelInfo,
@@ -9,7 +11,18 @@ import type {
   ReviewStrategy,
 } from '@devdigest/shared';
 import { AgentsRepository } from './repository.js';
-import { toAgentDto, toAgentVersionDto } from './helpers.js';
+import {
+  bucketFindingsBySeverityWeek,
+  bucketRunsByDay,
+  computeAcceptRate,
+  costDelta,
+  findingsByCategory,
+  toAgentDto,
+  toAgentRunHistoryDto,
+  toAgentVersionDto,
+  averageOf,
+} from './helpers.js';
+import { STATS_SEVERITY_WEEKS, STATS_WINDOW_DAYS } from './constants.js';
 
 /**
  * A2 — agents service. Business logic for the Agents tab + Agent Editor.
@@ -182,5 +195,53 @@ export class AgentsService {
     } catch {
       return [];
     }
+  }
+
+  /** Per-agent run/accept summary for every agent in the workspace — the
+   *  Agents grid's card footers, in one round trip. Agents with no runs and
+   *  no decided findings in the last 30 days still appear, with nulls. */
+  async statsSummaries(workspaceId: string): Promise<AgentStatsSummary[]> {
+    const agents = await this.repo.list(workspaceId);
+    const rows = await this.repo.statsSummaries(workspaceId);
+    const byAgent = new Map(rows.map((r) => [r.agentId, r]));
+
+    return agents.map((agent) => {
+      const row = byAgent.get(agent.id);
+      return {
+        agent_id: agent.id,
+        runs_30d: row?.runs30d ?? 0,
+        accept_rate: row && row.decided > 0 ? row.accepted / row.decided : null,
+        avg_cost_usd: row?.avgCostUsd ?? null,
+      };
+    });
+  }
+
+  /** Full Stats-tab breakdown for one agent, or undefined if it doesn't exist
+   *  (or belongs to another workspace). */
+  async stats(workspaceId: string, agentId: string): Promise<AgentStatsDetail | undefined> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent) return undefined;
+
+    const detail = await this.repo.statsDetail(agentId);
+
+    return {
+      agent_id: agentId,
+      runs_30d: detail.runsCurrentWindow.length,
+      accept_rate: computeAcceptRate(detail.findings),
+      avg_cost_usd: averageOf(detail.runsCurrentWindow.map((r) => r.costUsd)),
+      runs_trend: bucketRunsByDay(detail.runsCurrentWindow, STATS_WINDOW_DAYS),
+      avg_cost_delta: costDelta(
+        detail.runsCurrentWindow.map((r) => r.costUsd),
+        detail.runsPriorWindow.map((r) => r.costUsd),
+      ),
+      avg_duration_ms: averageOf(detail.runsCurrentWindow.map((r) => r.durationMs)),
+      findings_last_30d: detail.findings.length,
+      findings_by_category: findingsByCategory(detail.findings),
+      findings_by_severity_weekly: bucketFindingsBySeverityWeek(
+        detail.findings,
+        STATS_SEVERITY_WEEKS,
+      ),
+      runs: detail.runHistory.map(toAgentRunHistoryDto),
+    };
   }
 }

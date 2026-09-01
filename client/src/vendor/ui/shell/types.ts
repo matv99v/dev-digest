@@ -1,4 +1,5 @@
 import type React from "react";
+import type { NavGroup } from "../nav";
 
 /** Minimal Link contract — Next's <Link> satisfies this. */
 export type LinkLike = React.ComponentType<{
@@ -20,6 +21,10 @@ export interface ShellContext {
   Link?: LinkLike;
   /** Active nav key (e.g. "pulls"). */
   activeKey?: string;
+  /** Nav groups to render in the sidebar. Falls back to the vendored default
+      `NAV` when omitted — the app supplies its own so new sections (e.g. the
+      Skills Lab group) don't require editing this vendored package. */
+  nav?: NavGroup[];
   /** Active repo id, used to fill :repoId in hrefs. */
   repoId?: string | null;
   repos?: RepoSummary[];

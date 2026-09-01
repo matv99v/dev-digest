@@ -7,6 +7,7 @@
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "menu": {
+      "create": "Create from scratch",
       "fromFile": "Import from file",
       "fromUrl": "Import from URL",
       "community": "Search community skills…"
@@ -28,7 +29,63 @@
     "notFound": {
       "title": "Skill not found",
       "body": "It may have been deleted."
+    },
+    "runOnEvals": "Run on evals",
+    "tabs": {
+      "config": "Config",
+      "preview": "Preview",
+      "evals": "Evals",
+      "stats": "Stats",
+      "versions": "Versions"
     }
+  },
+  "config": {
+    "title": "Configuration",
+    "enabled": "Enabled",
+    "name": "Name",
+    "description": "Description",
+    "descriptionHint": "The skill's interface — formulate it directively, the way you'd tell a reviewer what to do.",
+    "type": "Type",
+    "typeOptions": {
+      "rubric": "Rubric",
+      "convention": "Convention",
+      "security": "Security",
+      "custom": "Custom"
+    },
+    "save": "Save skill",
+    "saving": "Saving…",
+    "saved": "Saved (v{version})",
+    "savedToast": "Skill saved (v{version})"
+  },
+  "stats": {
+    "usedBy": "Used by",
+    "acceptRate": "Accept rate",
+    "acceptRateHint": "Share of accepted findings from agents that have this skill attached — attributed via the agent, not the skill alone.",
+    "acceptRateUnknown": "—",
+    "findings30d": "Findings (30d)",
+    "findingsByCategory": "Findings by category",
+    "agentsUsingThisSkill": "Agents using this skill",
+    "noAgents": "Not attached to any agent yet.",
+    "open": "Open"
+  },
+  "versions": {
+    "title": "Version history",
+    "count": "{count} versions",
+    "current": "Current",
+    "diff": "Diff",
+    "restore": "Restore",
+    "restoring": "Restoring…",
+    "restored": "Restored to v{version}",
+    "subtitle": "Every save snapshots the body so eval runs stay reproducible against the exact text they scored.",
+    "diffTitle": "Diff v{from} → v{to}",
+    "diffNoChange": "No changes between these versions."
+  },
+  "evals": {
+    "mountBody": "This tab will light up once the eval pipeline (a later lesson) can score this skill's effect on findings."
+  },
+  "editor": {
+    "unsaved": "unsaved",
+    "tokens": "~{count} tokens"
   },
   "drawer": {
     "title": "Add a skill",
@@ -88,6 +145,7 @@
     }
   },
   "preview": {
+    "subtitle": "Rendered as the reviewing agent receives it.",
     "untrustedBadge": "untrusted source",
     "enabled": "Enabled",
     "disabled": "Disabled",
@@ -96,6 +154,7 @@
     "untrustedNotice": "This skill came from an untrusted source. Its body is stored as data (delimiter-wrapped) and must be vetted before it is enabled for an agent.",
     "bodyLabel": "Skill body (Markdown)",
     "bodyHint": "Saving a changed body creates a new immutable version.",
-    "version": "v{version}"
+    "version": "v{version}",
+    "title": "Preview"
   }
 }

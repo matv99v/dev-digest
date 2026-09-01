@@ -21,6 +21,16 @@ export const CAT: Record<Category, { icon: IconName; label: string }> = {
   test: { icon: "FlaskConical", label: "test" },
 };
 
+export type SkillType = "rubric" | "convention" | "security" | "custom";
+
+/** Color-codes a skill's type badge (Skills list, Skills tab). */
+export const SKILL_TYPE: Record<SkillType, { c: string; bg: string }> = {
+  rubric: { c: "var(--accent-text)", bg: "var(--accent-bg)" },
+  convention: { c: "var(--ok)", bg: "var(--ok-bg)" },
+  security: { c: "var(--crit)", bg: "var(--crit-bg)" },
+  custom: { c: "var(--text-muted)", bg: "var(--bg-hover)" },
+};
+
 export interface ButtonProps
   extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
   kind?: "primary" | "secondary" | "tertiary" | "ghost" | "danger";

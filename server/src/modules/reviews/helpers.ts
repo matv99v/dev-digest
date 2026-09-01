@@ -3,7 +3,9 @@
  * their arguments — no DB / network / `this`).
  */
 import type { Finding } from '@devdigest/shared';
+import { wrapUntrusted } from '@devdigest/reviewer-core';
 import type { FindingRow, PullRow, ReviewRow } from './repository.js';
+import type { LinkedSkillRow } from '../agents/repository.js';
 
 // reduceReviews + sliceDiff live in @devdigest/reviewer-core (pure engine logic
 // shared with the CI runner); re-exported here for backward-compatible imports.
@@ -71,6 +73,27 @@ export function reviewToDto(
     created_at: review.createdAt.toISOString(),
     findings: findings.map(findingRowToDto),
   };
+}
+
+/**
+ * Enabled linked skills, in `order`, → prompt blocks for `assemblePrompt`'s
+ * `skills` slot (`## Skills / rules` in the user message).
+ *
+ * Trust is by source: a skill the workspace owner wrote (`manual` /
+ * `extracted`) is injected raw, same as the agent's own system prompt. A
+ * skill that came from outside the workspace (`imported_url` / `community`)
+ * is a stranger's instructions, so it is delimiter-wrapped like the diff or
+ * a PR description — INJECTION_GUARD then treats it as data to analyze, not
+ * as something that can redirect the review.
+ */
+export function toSkillPromptBlocks(links: LinkedSkillRow[]): string[] {
+  return links
+    .filter((l) => l.skill.enabled)
+    .map((l) =>
+      l.skill.source === 'manual' || l.skill.source === 'extracted'
+        ? l.skill.body
+        : wrapUntrusted(`skill:${l.skill.name}`, l.skill.body),
+    );
 }
 
 /**

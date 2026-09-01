@@ -6,7 +6,9 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import { SKILL_CATALOG, SEED_SKILL_LINKS } from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -18,11 +20,12 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, the four built-in agents (General + Security +
+ * Performance + Test Quality), all on the default openrouter/deepseek-v4-flash
+ * provider+model, and a small skill catalogue (L02) linked to three of them.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -211,6 +214,18 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description:
+        'Reviews test quality: uncovered branches, missed corner cases, over-mocking, flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +233,61 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- skills (L02) + agent_skills links ----
+  // Idempotent, same select-then-insert-if-absent shape as seedAgents above.
+  // Every catalog skill is created (linked or not); links are applied after,
+  // by name, so a skill's position in SKILL_CATALOG is independent of
+  // whether — or to which agent — it ends up attached.
+  const agentIdByName = new Map<string, string>();
+  for (const a of seedAgents) {
+    const [row] = await db
+      .select({ id: t.agents.id })
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
+    if (row) agentIdByName.set(a.name, row.id);
+  }
+
+  const skillIdByName = new Map<string, string>();
+  for (const skill of SKILL_CATALOG) {
+    let [skillRow] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, skill.name)));
+    if (!skillRow) {
+      [skillRow] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: skill.name,
+          description: skill.description,
+          type: skill.type,
+          source: skill.source,
+          body: skill.body,
+          enabled: skill.enabled ?? true,
+          version: 1,
+        })
+        .returning();
+      await db.insert(t.skillVersions).values({
+        skillId: skillRow!.id,
+        version: 1,
+        body: skill.body,
+        message: null,
+      });
+    }
+    skillIdByName.set(skill.name, skillRow!.id);
+  }
+
+  for (const { skillName, agentName, order } of SEED_SKILL_LINKS) {
+    const agentId = agentIdByName.get(agentName);
+    const skillId = skillIdByName.get(skillName);
+    if (agentId && skillId) {
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId, skillId, order })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

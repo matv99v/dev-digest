@@ -19,6 +19,7 @@ const VersionParams = z.object({
 /**
  * A2 — agents module (owner A2).
  *   GET    /agents                  → list (workspace-scoped)
+ *   GET    /agents/stats            → run/accept summary for every agent (card footers)
  *   GET    /agents/:id              → one agent
  *   POST   /agents                  → create
  *   PUT    /agents/:id              → update / toggle enabled (versions config)
@@ -27,6 +28,7 @@ const VersionParams = z.object({
  *   GET    /agents/:id/skills       → linked skills (ordered)
  *   POST   /agents/:id/skills       → set/reorder linked skills OR link one
  *   GET    /agents/:id/models       → dynamic model list for the agent's provider
+ *   GET    /agents/:id/stats        → run history + finding stats (Stats tab)
  *   GET    /providers/:id/models    → dynamic model list for a provider (editor)
  */
 
@@ -74,6 +76,14 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
   app.get('/agents', async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     return service.list(workspaceId);
+  });
+
+  // Static segment — registered ahead of `/agents/:id` so it can never be
+  // shadowed by the param route (find-my-way would prefer it either way, but
+  // this keeps intent obvious from the registration order too).
+  app.get('/agents/stats', async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    return service.statsSummaries(workspaceId);
   });
 
   app.get('/agents/:id', { schema: { params: IdParams } }, async (req) => {
@@ -174,5 +184,12 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
   app.get('/providers/:id/models', { schema: { params: ProviderParams } }, async (req) => {
     await getContext(app.container, req);
     return service.listModels(req.params.id);
+  });
+
+  app.get('/agents/:id/stats', { schema: { params: IdParams } }, async (req) => {
+    const { workspaceId } = await getContext(app.container, req);
+    const stats = await service.stats(workspaceId, req.params.id);
+    if (!stats) throw new NotFoundError('Agent not found');
+    return stats;
   });
 }

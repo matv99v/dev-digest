@@ -3,9 +3,10 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { NAV, SETTINGS_ITEM, resolveHref, type Command } from "@devdigest/ui";
+import { SETTINGS_ITEM, resolveHref, type Command } from "@devdigest/ui";
 import { useActiveRepo } from "@/lib/repo-context";
 import { useTheme } from "@/lib/theme";
+import { APP_NAV } from "@/components/app-shell/nav";
 
 /**
  * Builds the command-palette command set: one "Go to …" command per nav item,
@@ -18,7 +19,7 @@ export function useShellCommands(): Command[] {
   const { theme, toggle } = useTheme();
 
   return React.useMemo<Command[]>(() => {
-    const navCmds: Command[] = NAV.flatMap((g) =>
+    const navCmds: Command[] = APP_NAV.flatMap((g) =>
       g.items.map((it) => ({
         id: it.key,
         label: t("commandPalette.goTo", { label: t(`nav.${it.key}`) }),

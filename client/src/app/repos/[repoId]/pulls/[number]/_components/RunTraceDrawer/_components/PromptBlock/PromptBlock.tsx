@@ -30,11 +30,15 @@ export function PromptBlock({ label, text, color }: { label: string; text: strin
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
+  const tokens = Math.ceil((text?.length ?? 0) / 4);
   return (
     <div style={s.promptRow}>
       <div onClick={() => setOpen((o) => !o)} style={s.promptHead}>
         <span style={s.promptDot(color)} />
         <span style={s.promptLabel}>{label}</span>
+        <span className="tnum" style={s.promptTokens}>
+          {t("trace.prompt.tokens", { count: tokens })}
+        </span>
         <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
           <button
             type="button"

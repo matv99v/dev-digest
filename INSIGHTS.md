@@ -78,6 +78,21 @@ exactly when the `description` goes stale, because the body is what you are look
 
 ## Tool & Library Notes
 
+### 2026-09-01 — A rarely-invoked skill loses its `description` to the listing budget, which makes it rarer still
+**Cause:** `engineering-insights` under-triggered, and the wording was only half of it. Claude
+Code loads a listing of every skill name plus description budgeted at 1% of the context window,
+and when that overflows it drops descriptions **starting with the skills you invoke least**.
+With ~30 skills installed here, the skill that fires least is first to lose the text that makes
+it fire, so under-triggering feeds itself and the file looks fine from the inside.
+**Rule:** front-load the trigger, do not pad. A `SKILL.md` may also carry `when_to_use:` — a
+separate frontmatter field appended *after* `description` in the listing; both share one
+1,536-char cap and truncation eats the tail, so put the imperative ("ALWAYS invoke when…") in
+`description` and the trigger phrases and negative triggers in `when_to_use`, where losing them
+costs least. Run `claude plugin validate .claude/skills` after any frontmatter edit: a
+malformed `>-` block loads the body with **no** description at all, and that failure is
+indistinguishable from ordinary under-triggering.
+**Evidence:** `.claude/skills/engineering-insights/SKILL.md:3-24`.
+
 ### 2026-08-31 — A `PreToolUse` Bash hook that substring-matches the command fires on any command that merely mentions it
 **Cause:** the gate matched `case "$cmd" in *"git push"*)`. The Bash tool hands the hook the
 *whole* command string, heredoc bodies included, so writing a file whose **content** contained

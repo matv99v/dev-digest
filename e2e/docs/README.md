@@ -12,7 +12,7 @@ owns the suite's place in CI.
 
 ## Neighbours
 
-- `../CLAUDE.md` — commands, gotchas, do-not-touch (loaded every session)
+- `../AGENTS.md` — commands, gotchas, do-not-touch (loaded every session)
 - `../INSIGHTS.md` — lessons learned: cause + rule
 - `../specs/` — a spec per feature · `../flows/` — the runnable flow files
 

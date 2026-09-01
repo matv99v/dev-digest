@@ -6,7 +6,7 @@ import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
 import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './repository.js';
 import { REVIEW_STRATEGY } from './constants.js';
-import { taskLine } from './helpers.js';
+import { taskLine, toSkillPromptBlocks } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
@@ -184,6 +184,15 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // L02 — enabled skills linked to this agent, in order. Bodies from a
+      // manual/extracted skill are trusted (the workspace owner wrote them);
+      // imported/community ones are delimiter-wrapped by toSkillPromptBlocks.
+      const linkedSkills = await this.container.agentsRepo.linkedSkills(agent.id);
+      const skillBlocks = toSkillPromptBlocks(linkedSkills);
+      if (skillBlocks.length) {
+        runLog.info(`skills: ${skillBlocks.length} enabled skill(s) attached`);
+      }
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -204,6 +213,9 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // L02 — enabled linked skills, in order. Omitted (no `## Skills / rules`
+        // section) when the agent has none attached, or all are disabled.
+        ...(skillBlocks.length ? { skills: skillBlocks } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),

@@ -6,9 +6,9 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Skeleton, Icon } from "@devdigest/ui";
-import { AppShell } from "../../../../components/app-shell";
-import { useAgents, useUpdateAgent } from "../../../../lib/hooks/agents";
-import { AgentCard } from "../AgentCard";
+import { AppShell } from "@/components/app-shell";
+import { useAgents, useAgentStatsSummaries, useDeleteAgent, useUpdateAgent } from "@/lib/hooks/agents";
+import { AgentCard } from "@/app/agents/_components/AgentCard";
 import { CreateAgentModal } from "./_components/CreateAgentModal";
 import { TEMPLATES } from "./constants";
 import { filterAgents } from "./helpers";
@@ -18,11 +18,14 @@ export function AgentsListView() {
   const t = useTranslations("agents");
   const router = useRouter();
   const { data: agents, isLoading, isError, refetch } = useAgents();
+  const { data: statsSummaries } = useAgentStatsSummaries();
   const update = useUpdateAgent();
+  const del = useDeleteAgent();
   const [creating, setCreating] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
   const list = filterAgents(agents ?? [], search);
+  const statsByAgent = new Map((statsSummaries ?? []).map((st) => [st.agent_id, st]));
 
   return (
     <AppShell crumb={[{ label: t("list.breadcrumbLab") }, { label: t("list.breadcrumb") }]}>
@@ -77,7 +80,23 @@ export function AgentsListView() {
             title={t("list.emptyTitle")}
             body={t("list.emptyBody")}
             cta={t("list.emptyCta")}
+            ctaKind="primary"
             onCta={() => setCreating(true)}
+            secondary={
+              <Dropdown
+                width={200}
+                trigger={
+                  <Button kind="secondary" iconRight="ChevronDown">
+                    {t("list.startFromTemplate")}
+                  </Button>
+                }
+                items={TEMPLATES.map((tp) => ({
+                  label: tp,
+                  icon: "Cpu" as const,
+                  onClick: () => setCreating(true),
+                }))}
+              />
+            }
           />
         )}
         {list.length > 0 && (
@@ -86,8 +105,11 @@ export function AgentsListView() {
               <AgentCard
                 key={a.id}
                 ag={a}
+                stats={statsByAgent.get(a.id)}
                 onClick={() => router.push(`/agents/${a.id}?tab=config`)}
                 onToggle={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
+                onDelete={() => del.mutate(a.id)}
+                deleting={del.isPending && del.variables === a.id}
               />
             ))}
           </div>

@@ -11,9 +11,9 @@ import { SeverityCounts } from "@/components/severity-counts";
 import { FindingsPreview } from "@/components/findings-preview";
 import { usePrReviews } from "@/lib/hooks/reviews";
 import { setPendingFinding } from "@/lib/finding-target";
-import { SIZE_COLOR, STATUS_META } from "../../constants";
-import { relativeTime, sizeOf } from "../../helpers";
-import { s } from "../../styles";
+import { SIZE_COLOR, STATUS_META } from "@/app/repos/[repoId]/pulls/constants";
+import { relativeTime, sizeOf } from "@/app/repos/[repoId]/pulls/helpers";
+import { s } from "@/app/repos/[repoId]/pulls/styles";
 
 export function PRRow({ pr, repoId }: { pr: PrMeta; repoId: string }) {
   const t = useTranslations("prReview");

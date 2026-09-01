@@ -11,7 +11,7 @@ Don't restate architecture here — `../README.md` owns the UI route map, and
 
 ## Neighbours
 
-- `../CLAUDE.md` — commands, gotchas, do-not-touch (loaded every session)
+- `../AGENTS.md` — commands, gotchas, do-not-touch (loaded every session)
 - `../INSIGHTS.md` — lessons learned: cause + rule
 - `../specs/` — a spec per feature, written before it is built
 

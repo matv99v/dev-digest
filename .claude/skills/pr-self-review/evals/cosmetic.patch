@@ -1,0 +1,25 @@
+diff --git a/client/src/lib/github-urls.ts b/client/src/lib/github-urls.ts
+index 2efb94e..39c69c1 100644
+--- a/client/src/lib/github-urls.ts
++++ b/client/src/lib/github-urls.ts
+@@ -5,13 +5,18 @@
+ const HOST = "https://github.com";
+ 
+ /** Encode a repo-relative path for a URL while keeping "/" separators. */
+-function encPath(file: string): string {
+-  return file
++function encPath(fileRelativePathString: string): string {
++  return fileRelativePathString
+     .split("/")
+     .map(encodeURIComponent)
+     .join("/");
+ }
+ 
++/** https://github.com/{owner}/{repo}/commits/{sha} */
++export function githubCommitsUrl(repoFullName: string, sha: string): string {
++  return `${HOST}/${repoFullName}/commits/${sha}`;
++}
++
+ /** https://github.com/{owner}/{repo}/pull/{number} */
+ export function githubPrUrl(repoFullName: string, number: number): string {
+   return `${HOST}/${repoFullName}/pull/${number}`;

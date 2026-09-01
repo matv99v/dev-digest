@@ -1,8 +1,8 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
-import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
+import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION, RUN_HISTORY_LIMIT } from './constants.js';
 import { isConfigChange } from './helpers.js';
 
 /**
@@ -232,5 +232,169 @@ export class AgentsRepository {
     await this.db
       .insert(t.agentSkills)
       .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+  }
+
+  // ---- Stats — agent_runs + reviews/findings, workspace-scoped -------------
+
+  /**
+   * Per-agent run/accept summary for every agent in the workspace, over the
+   * last 30 days — the batch used by the Agents grid's card footers. Only
+   * agents with at least one row in either query appear; the service fills
+   * every other agent in the workspace with zeros/nulls.
+   */
+  async statsSummaries(workspaceId: string): Promise<
+    { agentId: string; runs30d: number; avgCostUsd: number | null; accepted: number; decided: number }[]
+  > {
+    const runRows = await this.db
+      .select({
+        agentId: t.agentRuns.agentId,
+        runs30d: count(),
+        avgCost: sql<string | null>`avg(${t.agentRuns.costUsd})`,
+      })
+      .from(t.agentRuns)
+      .where(
+        and(
+          eq(t.agentRuns.workspaceId, workspaceId),
+          gte(t.agentRuns.ranAt, sql`now() - interval '30 days'`),
+        ),
+      )
+      .groupBy(t.agentRuns.agentId);
+
+    const findingRows = await this.db
+      .select({
+        agentId: t.reviews.agentId,
+        accepted: sql<string>`count(*) filter (where ${t.findings.acceptedAt} is not null)`,
+        decided: sql<string>`count(*) filter (where ${t.findings.acceptedAt} is not null or ${t.findings.dismissedAt} is not null)`,
+      })
+      .from(t.findings)
+      .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+      .where(
+        and(
+          eq(t.reviews.workspaceId, workspaceId),
+          gte(t.reviews.createdAt, sql`now() - interval '30 days'`),
+        ),
+      )
+      .groupBy(t.reviews.agentId);
+
+    const acceptByAgent = new Map<string, { accepted: number; decided: number }>();
+    for (const r of findingRows) {
+      if (!r.agentId) continue;
+      acceptByAgent.set(r.agentId, { accepted: Number(r.accepted), decided: Number(r.decided) });
+    }
+
+    return runRows
+      .filter((r): r is typeof r & { agentId: string } => r.agentId != null)
+      .map((r) => {
+        const acc = acceptByAgent.get(r.agentId);
+        return {
+          agentId: r.agentId,
+          runs30d: Number(r.runs30d),
+          avgCostUsd: r.avgCost == null ? null : Number(r.avgCost),
+          accepted: acc?.accepted ?? 0,
+          decided: acc?.decided ?? 0,
+        };
+      });
+  }
+
+  /** agent_runs rows for one agent, `ranAt` in the last 30 days. */
+  private async runRowsCurrentWindow(
+    agentId: string,
+  ): Promise<{ ranAt: Date | null; durationMs: number | null; costUsd: number | null }[]> {
+    return this.db
+      .select({
+        ranAt: t.agentRuns.ranAt,
+        durationMs: t.agentRuns.durationMs,
+        costUsd: t.agentRuns.costUsd,
+      })
+      .from(t.agentRuns)
+      .where(
+        and(
+          eq(t.agentRuns.agentId, agentId),
+          gte(t.agentRuns.ranAt, sql`now() - interval '30 days'`),
+        ),
+      );
+  }
+
+  /** agent_runs rows for one agent, `ranAt` 30–60 days ago — the baseline
+   *  `avg_cost_delta` compares the current window against. */
+  private async runRowsPriorWindow(agentId: string): Promise<{ costUsd: number | null }[]> {
+    return this.db
+      .select({ costUsd: t.agentRuns.costUsd })
+      .from(t.agentRuns)
+      .where(
+        and(
+          eq(t.agentRuns.agentId, agentId),
+          gte(t.agentRuns.ranAt, sql`now() - interval '60 days'`),
+          lt(t.agentRuns.ranAt, sql`now() - interval '30 days'`),
+        ),
+      );
+  }
+
+  /** Everything the Stats tab needs for one agent, as raw rows — bucketing and
+   *  aggregation are pure functions in `./helpers.ts` over these. */
+  async statsDetail(agentId: string): Promise<{
+    runsCurrentWindow: { ranAt: Date | null; durationMs: number | null; costUsd: number | null }[];
+    runsPriorWindow: { costUsd: number | null }[];
+    findings: { category: string; severity: string; acceptedAt: Date | null; dismissedAt: Date | null; reviewCreatedAt: Date | null }[];
+    runHistory: {
+      runId: string;
+      ranAt: Date | null;
+      repoId: string | null;
+      prNumber: number | null;
+      tokensIn: number | null;
+      tokensOut: number | null;
+      costUsd: number | null;
+      durationMs: number | null;
+      findingsCount: number | null;
+      source: string | null;
+      status: string | null;
+    }[];
+  }> {
+    const [runsCurrentWindow, runsPriorWindow, findingRows, runHistory] = await Promise.all([
+      this.runRowsCurrentWindow(agentId),
+      this.runRowsPriorWindow(agentId),
+      this.db
+        .select({
+          category: t.findings.category,
+          severity: t.findings.severity,
+          acceptedAt: t.findings.acceptedAt,
+          dismissedAt: t.findings.dismissedAt,
+          reviewCreatedAt: t.reviews.createdAt,
+        })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.reviews.id, t.findings.reviewId))
+        .where(
+          and(
+            eq(t.reviews.agentId, agentId),
+            gte(t.reviews.createdAt, sql`now() - interval '30 days'`),
+          ),
+        ),
+      this.db
+        .select({
+          runId: t.agentRuns.id,
+          ranAt: t.agentRuns.ranAt,
+          repoId: t.pullRequests.repoId,
+          prNumber: t.pullRequests.number,
+          tokensIn: t.agentRuns.tokensIn,
+          tokensOut: t.agentRuns.tokensOut,
+          costUsd: t.agentRuns.costUsd,
+          durationMs: t.agentRuns.durationMs,
+          findingsCount: t.agentRuns.findingsCount,
+          source: t.agentRuns.source,
+          status: t.agentRuns.status,
+        })
+        .from(t.agentRuns)
+        .leftJoin(t.pullRequests, eq(t.pullRequests.id, t.agentRuns.prId))
+        .where(eq(t.agentRuns.agentId, agentId))
+        .orderBy(desc(t.agentRuns.ranAt))
+        .limit(RUN_HISTORY_LIMIT),
+    ]);
+
+    return {
+      runsCurrentWindow,
+      runsPriorWindow,
+      findings: findingRows,
+      runHistory,
+    };
   }
 }

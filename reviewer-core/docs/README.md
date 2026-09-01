@@ -11,7 +11,7 @@ Don't restate the pipeline here — `../README.md` owns it.
 
 ## Neighbours
 
-- `../CLAUDE.md` — commands, gotchas, the purity constraint (loaded every session)
+- `../AGENTS.md` — commands, gotchas, the purity constraint (loaded every session)
 - `../INSIGHTS.md` — lessons learned: cause + rule
 - `../specs/` — a spec per feature, written before it is built
 

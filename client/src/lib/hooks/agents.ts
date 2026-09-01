@@ -2,13 +2,37 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import { api } from "@/lib/api";
+import type {
+  Agent,
+  AgentStatsDetail,
+  AgentStatsSummary,
+  ModelInfo,
+  Provider,
+  ReviewStrategy,
+} from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
     queryKey: ["agents"],
     queryFn: () => api.get<Agent[]>("/agents"),
+  });
+}
+
+/** Run/accept summary for every agent in the workspace — one round trip for
+    the Agents grid's card footers. */
+export function useAgentStatsSummaries() {
+  return useQuery({
+    queryKey: ["agent-stats-summaries"],
+    queryFn: () => api.get<AgentStatsSummary[]>("/agents/stats"),
+  });
+}
+
+export function useAgentStats(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-stats", id],
+    queryFn: () => api.get<AgentStatsDetail>(`/agents/${id}/stats`),
+    enabled: !!id,
   });
 }
 

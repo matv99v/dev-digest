@@ -5,7 +5,7 @@ Lessons learned working in `@devdigest/web`. Append with `/engineering-insights`
 entry that supersedes it. If a finding also concerns another module, write that module's
 half in its own `INSIGHTS.md`. The root file is for root config and CI only.
 
-When an entry has bitten twice, promote its **Rule** into `CLAUDE.md` and leave the cause
+When an entry has bitten twice, promote its **Rule** into `AGENTS.md` and leave the cause
 here. Architectural decisions with reasoning belong in `docs/`, not here. Prune
 quarterly; past ~30 entries, split by domain.
 
@@ -36,7 +36,16 @@ way, so it cannot catch this.
 
 ## Codebase Patterns
 
-_No entries yet._
+### 2026-08-31 — `src/vendor/shared/contracts/` lags the server's copy — a missing field is usually drift, not your bug
+**Cause:** these files are a regenerated copy of `server/src/vendor/shared/contracts/`, and the
+regeneration is not automatic. Four pairs are out of sync today, so a value the API plainly
+returns can be absent from the schema here — `productionize.ts` accepts only
+`'openai' | 'anthropic'` while the server has also had `'openrouter'` for some time.
+**Rule:** when a payload fails to parse or a union is missing a member, diff this file against
+its server twin before debugging the page — the fix is the regeneration step, never hand-editing
+this copy (it is do-not-touch per `AGENTS.md`).
+**Evidence:** `src/vendor/shared/contracts/productionize.ts:36` vs
+`server/src/vendor/shared/contracts/productionize.ts:36`.
 
 ## Tool & Library Notes
 

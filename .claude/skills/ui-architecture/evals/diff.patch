@@ -1,0 +1,46 @@
+diff --git a/client/src/constants/severity.ts b/client/src/constants/severity.ts
+new file mode 100644
+--- /dev/null
++++ b/client/src/constants/severity.ts
+@@ -0,0 +1,6 @@
++export const SEVERITY_LABEL = {
++  CRITICAL: "Critical",
++  WARNING: "Warning",
++  SUGGESTION: "Suggestion",
++};
++export const TRACE_POLL_MS = 4000;
+diff --git a/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/TraceStats.tsx b/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/TraceStats.tsx
+new file mode 100644
+--- /dev/null
++++ b/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/TraceStats.tsx
+@@ -0,0 +1,24 @@
++"use client";
++
++import { useEffect, useState } from "react";
++import type { TraceSummary } from "../../../../../../../../../lib/types";
++import { SEVERITY_LABEL, TRACE_POLL_MS } from "@/constants/severity";
++
++export function TraceStats({ runId }: { runId: string }) {
++  const [stats, setStats] = useState<TraceSummary | null>(null);
++
++  useEffect(() => {
++    const load = async () => {
++      const res = await fetch(
++        `${process.env.NEXT_PUBLIC_API_BASE}/runs/${runId}/trace/summary`
++      );
++      setStats(await res.json());
++    };
++    load();
++    const t = setInterval(load, TRACE_POLL_MS);
++    return () => clearInterval(t);
++  }, [runId]);
++
++  if (!stats) return null;
++  return <div>{SEVERITY_LABEL[stats.topSeverity]}: {stats.count}</div>;
++}
+diff --git a/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/index.ts b/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/index.ts
+new file mode 100644
+--- /dev/null
++++ b/client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceStats/index.ts
+@@ -0,0 +1 @@
++export * from "./TraceStats";

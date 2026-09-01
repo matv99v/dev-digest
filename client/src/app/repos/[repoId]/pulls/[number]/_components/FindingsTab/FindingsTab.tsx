@@ -2,9 +2,9 @@
 
 import React, { useCallback } from "react";
 import { Icon, Badge, Button, SectionLabel, EmptyState } from "@devdigest/ui";
-import { RunStatus } from "../RunStatus";
-import { RunHistory, type GoToReviewOpts } from "../RunHistory/RunHistory";
-import { ReviewRunAccordion } from "../ReviewRunAccordion";
+import { RunStatus } from "@/app/repos/[repoId]/pulls/[number]/_components/RunStatus";
+import { RunHistory, type GoToReviewOpts } from "@/app/repos/[repoId]/pulls/[number]/_components/RunHistory/RunHistory";
+import { ReviewRunAccordion } from "@/app/repos/[repoId]/pulls/[number]/_components/ReviewRunAccordion";
 import { s } from "./styles";
 import type { FindingRecord, ReviewRecord, RunSummary, PrCommit, Severity } from "@devdigest/shared";
 import type { UseMutationResult } from "@tanstack/react-query";

@@ -37,4 +37,6 @@ screen to check. Not "it should work".
 
 ## Contents
 
-_No specs yet._
+- [01-skills-in-the-product.md](01-skills-in-the-product.md) — reusable, versioned,
+  attachable review-instruction skills; feeds `reviewer-core`'s existing `skills` prompt
+  slot.

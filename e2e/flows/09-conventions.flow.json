@@ -1,0 +1,12 @@
+{
+  "name": "Conventions page renders the seeded scan for the demo repo",
+  "description": "From the seeded repo's PR list, follow the sidebar nav to Conventions and confirm a seeded candidate (the accepted async/await rule from seed-conventions.ts) renders via ConventionCard. Never clicks Run extraction — that would call the LLM, which this suite deliberately never does. Exercises the /repos/<id>/conventions route and its API fetch.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["find", "text", "Conventions", "click"], "label": "open Conventions from the sidebar nav" },
+    { "cmd": ["wait", "--url", "/conventions"], "label": "navigate to the repo's conventions route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "conventions fetch settles" },
+    { "cmd": ["wait", "--text", "async/await instead of .then()"], "label": "seeded accepted candidate is visible" }
+  ]
+}

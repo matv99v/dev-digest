@@ -6,7 +6,7 @@ import { FormField, TextInput, SelectInput, Toggle, Button } from "@devdigest/ui
 import type { Skill } from "@devdigest/shared";
 import { useUpdateSkill } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { SkillBodyEditor } from "@/app/skills/_components/SkillBodyEditor";
+import { SkillBodyEditor } from "@/components/skill-body-editor";
 import { TYPE_VALUES } from "./constants";
 import { s } from "./styles";
 

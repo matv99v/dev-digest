@@ -1,7 +1,11 @@
 /* SkillBodyEditor — hand-rolled markdown body editor: filename chip + unsaved
    badge + token count, and a line-numbered gutter scroll-synced to a plain
    mono <textarea>. No syntax highlighting (approved design decision) and no
-   editor dependency — this is app-level, not a @devdigest/ui primitive. */
+   editor dependency — this is app-level, not a @devdigest/ui primitive.
+
+   Promoted here from app/skills/_components/SkillBodyEditor on its second
+   consumer (the Conventions "Create skill" modal) — see ui-architecture's
+   promote-and-delete rule. */
 "use client";
 
 import React from "react";

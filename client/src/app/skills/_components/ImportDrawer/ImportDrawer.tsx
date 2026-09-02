@@ -11,7 +11,7 @@ import { Drawer, Button, FormField, TextInput, Tabs } from "@devdigest/ui";
 import type { SkillImportPreview } from "@devdigest/shared";
 import { useCreateSkill, useImportSkillPreview } from "@/lib/hooks/skills";
 import { useToast } from "@/lib/toast";
-import { SkillBodyEditor } from "@/app/skills/_components/SkillBodyEditor";
+import { SkillBodyEditor } from "@/components/skill-body-editor";
 import { DRAWER_WIDTH, IMPORT_TABS, type ImportTab } from "./constants";
 import { fileToBase64 } from "./helpers";
 import { s } from "./styles";

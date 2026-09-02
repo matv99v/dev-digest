@@ -32,6 +32,8 @@ export const SkillStats = z.object({
   accept_rate: z.number().min(0).max(1).nullable(),
   findings_last_30d: z.number().int(),
   findings_by_category: z.record(z.string(), z.number().int()),
+  /** True when the workspace has pinned this skill to the top of the list. */
+  pinned: z.boolean().nullish(),
 });
 export type SkillStats = z.infer<typeof SkillStats>;
 

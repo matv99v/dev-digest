@@ -11,7 +11,7 @@ import { z } from 'zod';
 export const Severity = z.enum(['CRITICAL', 'WARNING', 'SUGGESTION']);
 export type Severity = z.infer<typeof Severity>;
 
-export const FindingCategory = z.enum(['bug', 'security', 'perf', 'style', 'test']);
+export const FindingCategory = z.enum(['bug', 'security', 'perf', 'style', 'test', 'a11y']);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 
 export const FindingKind = z.enum([

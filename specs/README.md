@@ -40,3 +40,6 @@ screen to check. Not "it should work".
 - [01-skills-in-the-product.md](01-skills-in-the-product.md) — reusable, versioned,
   attachable review-instruction skills; feeds `reviewer-core`'s existing `skills` prompt
   slot.
+- [02-conventions-extractor.md](02-conventions-extractor.md) — scan a repo for its actual
+  conventions, verify evidence in code, accept/reject, and turn accepted candidates into a
+  skill.

@@ -36,6 +36,19 @@ way, so it cannot catch this.
 
 ## Codebase Patterns
 
+### 2026-09-01 — `CategoryTag` only renders the fixed findings taxonomy; it silently renders nothing for any other string
+**Cause:** `CategoryTag`'s `category` prop is typed to the findings `Category` union and looks
+up `CAT[category]` — for any string outside that union (e.g. a Conventions Extractor
+candidate's freeform `category` field, "naming", "error-handling", ...) `CAT[category]` is
+`undefined` and the component returns `null`. No type error either, since callers routinely
+pass it a plain `string` cast loosely.
+**Rule:** `CategoryTag` is for the findings severity/category taxonomy only. For any other
+freeform category/tag string, render a plain `Badge` instead — it takes arbitrary
+`children` and never silently drops content.
+**Evidence:** `src/vendor/ui/primitives/Badge.tsx:90` (`CategoryTag`) vs. its use as a plain
+`Badge` for `Convention.category` in
+`src/app/repos/[repoId]/conventions/_components/ConventionCard/ConventionCard.tsx`.
+
 ### 2026-08-31 — `src/vendor/shared/contracts/` lags the server's copy — a missing field is usually drift, not your bug
 **Cause:** these files are a regenerated copy of `server/src/vendor/shared/contracts/`, and the
 regeneration is not automatic. Four pairs are out of sync today, so a value the API plainly
@@ -49,7 +62,17 @@ this copy (it is do-not-touch per `AGENTS.md`).
 
 ## Tool & Library Notes
 
-_No entries yet._
+### 2026-09-01 — Hand-counting `../` for a `vi.mock` relative path is easy to get wrong, and the failure is silent
+**Cause:** `vi.mock` factories can't use the `@/` alias, so every test mocks its module by a
+relative path counted up from the test file's own directory. Counting the segments by eye
+is off-by-one prone once a component sits 5+ folders under `src/app` — I undercounted by one
+level writing `ConventionCard.test.tsx`'s mock of `@/lib/hooks`. A wrong count doesn't error:
+Vitest just fails to intercept the module, the component calls the *real* hook, and the test
+either throws deep inside React Query or passes for the wrong reason.
+**Rule:** don't count `../` by eye — compute it: `node -e "console.log(require('path').relative(require('path').dirname('<test file path>'), '<target module path>'))"` from the package root, then paste the result into `vi.mock(...)`.
+**Evidence:** `src/app/repos/[repoId]/conventions/_components/ConventionCard/ConventionCard.test.tsx:8`
+mocking `../../../../../../lib/hooks`; confirmed against the working precedent at
+`src/app/agents/[id]/_components/AgentEditor/_components/SkillsTab/SkillsTab.test.tsx:49`.
 
 ## Recurring Errors & Fixes
 

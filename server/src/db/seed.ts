@@ -9,6 +9,7 @@ import {
   TEST_QUALITY_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 import { SKILL_CATALOG, SEED_SKILL_LINKS } from './seed-skills.js';
+import { SEED_CONVENTIONS, SEED_CONVENTIONS_SCANNED_SHA } from './seed-conventions.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -22,10 +23,12 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
  * with a few findings, the four built-in agents (General + Security +
  * Performance + Test Quality), all on the default openrouter/deepseek-v4-flash
- * provider+model, and a small skill catalogue (L02) linked to three of them.
+ * provider+model, a small skill catalogue (L02) linked to three of them, and
+ * three conventions (L02, the other half) for the demo repo — one of each
+ * status (accepted/pending/rejected).
  *
- * Course lessons populate the remaining tables (conventions, memory, eval, …)
- * once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (memory, eval, …) once their
+ * features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -287,6 +290,38 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         .insert(t.agentSkills)
         .values({ agentId, skillId, order })
         .onConflictDoNothing();
+    }
+  }
+
+  // ---- conventions (L02, the other half) ----
+  // Idempotent, same select-then-insert-if-absent shape as seedAgents/SKILL_CATALOG
+  // above — keyed by (workspaceId, repoId, rule) since a convention has no
+  // natural unique name the way a skill does.
+  for (const c of SEED_CONVENTIONS) {
+    const [existing] = await db
+      .select({ id: t.conventions.id })
+      .from(t.conventions)
+      .where(
+        and(
+          eq(t.conventions.workspaceId, workspaceId),
+          eq(t.conventions.repoId, repoId),
+          eq(t.conventions.rule, c.rule),
+        ),
+      );
+    if (!existing) {
+      await db.insert(t.conventions).values({
+        workspaceId,
+        repoId,
+        rule: c.rule,
+        category: c.category,
+        evidencePath: c.evidencePath,
+        evidenceSnippet: c.evidenceSnippet,
+        evidenceLineStart: c.evidenceLineStart,
+        evidenceLineEnd: c.evidenceLineEnd,
+        confidence: c.confidence,
+        status: c.status,
+        scannedSha: SEED_CONVENTIONS_SCANNED_SHA,
+      });
     }
   }
 

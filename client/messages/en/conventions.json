@@ -15,12 +15,38 @@
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
       "cta": "Run extraction"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files",
+    "deselectAll": "Deselect all",
+    "selectAll": "Select all",
+    "acceptedCount": "{accepted} of {total} accepted",
+    "createSkill": "Create skill",
+    "lastScan": "last scan {time}"
   },
   "card": {
     "confidence": "Confidence",
     "accepted": "Accepted",
     "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "acceptAsSkill": "Accept as Skill",
+    "reject": "Reject",
+    "rejecting": "Rejecting…",
+    "rejected": "Rejected",
+    "edit": "Edit rule",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "mergedFromBanner": "Merged from {count} accepted conventions in {repo}",
+    "modeMerged": "One skill",
+    "modePerCategory": "One skill per category",
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "enabled": "Enabled",
+    "body": "Body",
+    "cancel": "Cancel",
+    "create": "Create",
+    "creating": "Creating…",
+    "successToast": "Skill created from conventions"
   }
 }

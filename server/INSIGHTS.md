@@ -26,6 +26,24 @@ _No entries yet._
 
 ## Codebase Patterns
 
+### 2026-09-01 — A repository that must run inside a service-opened transaction can't just take `Db`
+**Cause:** No module before `conventions` actually called `db.transaction(...)` — every
+existing repository is constructed with the plain `Db` (`PostgresJsDatabase<typeof schema>`)
+handle. `Db['transaction']`'s callback receives a `PgTransaction<...>`, which is NOT
+structurally the same type as `Db` (it lacks `$client` and other `PostgresJsDatabase`-only
+members), so a repository constructor typed `constructor(private db: Db)` fails to
+typecheck the moment you pass it a transaction handle (`new FooRepository(tx)` inside
+`db.transaction(async (tx) => ...)`).
+**Rule:** derive the transaction type FROM `Db` itself rather than typing it separately:
+`type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];` then type the repository
+constructor as `Db | Tx`. This guarantees the two stay in sync with whatever drizzle
+version is installed, and lets one repository instance serve both a plain read path and a
+service-opened transaction.
+**Evidence:** `src/modules/conventions/repository.ts:24` (the `Tx` derivation + `Db | Tx`
+constructor param), `src/modules/conventions/service.ts` `persist()` (opens
+`this.container.db.transaction(...)` and constructs the repository with `tx`, per the
+onion-architecture rule that the service — never the repository — owns transactions).
+
 ### 2026-09-01 — `contracts/observability.ts` pre-reserves names (`AgentStats`, `StatPoint`) for A5's future `GET /agents/:id/stats` — grep before naming a new contract
 **Cause:** Building the real `GET /agents/:id/stats` (Stats tab data) and naming its
 result type `AgentStats` compiled — `export *` collisions across barrel files are silent —
@@ -70,6 +88,22 @@ nullish) vs `:110` (`cost_usd` on RunSummary, a column → nullable);
 `src/db/schema/runs.ts:50`.
 
 ## Tool & Library Notes
+
+### 2026-09-01 — `MockGitClient.readFile` never throws for a missing path; the real `SimpleGitClient` does
+**Cause:** `SimpleGitClient.readFile` (`src/adapters/git/simple-git.ts:129`) is a bare
+`fs.readFile`, which rejects (ENOENT) for a path that doesn't exist in the clone — so real
+callers need a try/catch per file. `MockGitClient.readFile`
+(`src/adapters/mocks.ts:293`) instead returns `this.opts.files?.[path] ?? ''` — an empty
+string, never a rejection — so a test simulating "this file isn't in the clone" by simply
+omitting it from `files` will NOT exercise the try/catch path at all, only the
+falsy/empty-content check.
+**Rule:** when a function reads multiple candidate paths through `GitClient.readFile` and
+must skip missing ones gracefully, guard with BOTH a try/catch (for the real adapter) AND
+an `if (!raw) continue` / equivalent falsy check (for the mock) — dropping either one
+passes against only one of the two implementations.
+**Evidence:** `src/modules/conventions/sampler.ts` `readSampled()` (both guards present),
+`src/adapters/mocks.ts:293` (`MockGitClient.readFile`), `src/adapters/git/simple-git.ts:129`
+(`SimpleGitClient.readFile`).
 
 ### 2026-08-31 — Fastify's global `bodyLimit` silently rejects a JSON-base64 upload well under its own decoded-size limit
 **Cause:** `POST /skills/import` accepts a file up to 5 MB (`MAX_IMPORT_BYTES`,

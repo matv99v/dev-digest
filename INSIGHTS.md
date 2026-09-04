@@ -22,20 +22,6 @@ quarterly; past ~30 entries, split by domain.
 
 ## What Works
 
-### 2026-08-31 — A parallel checkout at `../orig-dev-digest` holds reference versions of this repo's skills
-**Cause:** `pr-self-review` was designed here from scratch while a working 359-line
-implementation already sat one directory over, on branch `lesson-2-lab/skills`. It had to be
-pointed out.
-**Rule:** before designing a skill or workflow here, look in `../orig-dev-digest/.claude/skills/`
-and diff against what is there. **Adapt, never copy** — that checkout's skill map routes to
-`vercel-react-best-practices`, `nodejs-best-practices` and two subagents that exist in neither
-tree, and its `CRITICAL/HIGH/MEDIUM` scale contradicts the product's own enum in
-`server/src/vendor/shared/contracts/findings.ts`. Verify every skill named in a routing table
-against `.claude/skills/`; a route to a skill that is not installed silently reviews less than
-it claims.
-**Evidence:** `../orig-dev-digest/.claude/skills/pr-self-review/gate.md`,
-`.claude/skills/pr-self-review/README.md:31-52`.
-
 ## What Doesn't Work
 
 ### 2026-08-31 — A ranking step nothing consumes is decorative, and it is where a dropped limit hides

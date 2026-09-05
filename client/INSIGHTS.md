@@ -36,6 +36,16 @@ way, so it cannot catch this.
 
 ## Codebase Patterns
 
+### 2026-09-05 — `EmptyState`'s `cta` has no `aria-label`/icon passthrough — use `secondary` for a custom accessible action
+**Cause:** `cta`/`onCta` render a fixed internal `<Button icon="Plus" onClick={onCta}>{cta}</Button>` — there
+is no prop to set `aria-label`, change the icon, or otherwise customize that button.
+**Rule:** When an empty-state action needs an `aria-label`, a different icon, or a `disabled`
+condition (e.g. "disabled while a mutation is pending"), don't fight the `cta` prop — build the
+`Button` yourself and pass it via `secondary`. `EmptyState` shows its action row when `cta ||
+secondary` is truthy, so `secondary` alone renders without the fixed CTA at all.
+**Evidence:** `client/src/vendor/ui/primitives/EmptyState.tsx:5-27`, used this way in
+`client/src/app/repos/[repoId]/pulls/[number]/_components/IntentCard/IntentCard.tsx`.
+
 ### 2026-09-01 — `CategoryTag` only renders the fixed findings taxonomy; it silently renders nothing for any other string
 **Cause:** `CategoryTag`'s `category` prop is typed to the findings `Category` union and looks
 up `CAT[category]` — for any string outside that union (e.g. a Conventions Extractor

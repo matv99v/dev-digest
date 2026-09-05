@@ -1,0 +1,34 @@
+{
+  "title": "Intent",
+  "confidence": {
+    "high": "High confidence",
+    "medium": "Medium confidence",
+    "low": "Low confidence"
+  },
+  "stale": "Stale — head has moved since this was derived",
+  "inScope": "In scope",
+  "outOfScope": "Out of scope",
+  "sources": "Evidence",
+  "derive": "Derive intent",
+  "deriveAria": "Derive PR intent",
+  "deriving": "Deriving…",
+  "reDerive": "Re-derive",
+  "empty": {
+    "title": "Intent not derived yet",
+    "body": "Derive the intent to see what this PR is trying to do, and what is in and out of scope."
+  },
+  "error": {
+    "title": "Couldn't load intent",
+    "body": "Try again."
+  },
+  "sourceKind": {
+    "pr_body": "PR description",
+    "inline_plan": "Inline plan/spec",
+    "linked_issue": "Linked issue",
+    "repo_doc": "Repo document",
+    "title": "PR title",
+    "branch": "Branch name",
+    "commits": "Commits",
+    "changed_paths": "Changed files"
+  }
+}

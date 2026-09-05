@@ -43,3 +43,6 @@ screen to check. Not "it should work".
 - [02-conventions-extractor.md](02-conventions-extractor.md) — scan a repo for its actual
   conventions, verify evidence in code, accept/reject, and turn accepted candidates into a
   skill.
+- [03-intent-layer.md](03-intent-layer.md) — derive what a PR is trying to do from its
+  body, linked issue and repo docs, cache it on `pr_intent`, and feed it into every
+  review run's prompt and the PR Overview tab.

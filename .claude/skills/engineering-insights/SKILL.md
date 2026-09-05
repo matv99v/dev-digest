@@ -1,26 +1,7 @@
 ---
 name: engineering-insights
-description: >-
-  ALWAYS invoke the moment this session produces a durable engineering lesson — a
-  correction the user gave you, an error hit twice, a dead end, a non-obvious cause, an
-  approach that finally worked and should be reused, a tool/library/CLI behaving against
-  its docs, an unstated codebase convention, an unresolved question — and ALWAYS again
-  before finishing any session that edited files. DO NOT end, summarise, or hand back
-  such a session without invoking this skill first. Invoking is MANDATORY; writing is not
-  — the skill's own three gates decide, and "nothing durable" is a correct and common
-  outcome, so invoking costs nothing. Appends the entry to the right INSIGHTS.md — the
-  module's (client, server, reviewer-core, e2e), or the repo root's for config, CI,
-  scripts, tooling and .claude/.
-when_to_use: >-
-  Trigger phrases: "wrap up", "retro", "we're done", "that's it", "anything worth
-  recording?", "before you finish", /engineering-insights. Trigger unprompted when: the
-  user corrects you; the same error appears twice in one session; you abandon an
-  approach; a dependency or CLI behaves against its docs; you learn by reading a
-  convention the code does not state. Do NOT trigger for a read-only question, an
-  exploration that changed no files, a formatting or rename pass, a clean change that
-  went exactly as expected, generic programming knowledge, a one-off unlikely to recur,
-  or a lesson already written in README.md, TESTING.md, AGENTS.md, docs/ or an
-  INSIGHTS.md.
+description: "ALWAYS invoke the moment this session produces a durable engineering lesson — a correction the user gave you, an error hit twice, a dead end, a non-obvious cause, an approach that finally worked and should be reused, a tool/library/CLI behaving against its docs, an unstated codebase convention, an unresolved question — and ALWAYS again before finishing any session that edited files. DO NOT end, summarise, or hand back such a session without invoking this skill first. Invoking is MANDATORY; writing is not — the skill's own three gates decide, and \"nothing durable\" is a correct and common outcome, so invoking costs nothing. Appends the entry to the right INSIGHTS.md — the module's (client, server, reviewer-core, e2e), or the repo root's for config, CI, scripts, tooling and .claude/."
+when_to_use: "Trigger phrases: \"wrap up\", \"retro\", \"we're done\", \"that's it\", \"anything worth recording?\", \"before you finish\", /engineering-insights. Trigger unprompted when: the user corrects you; the same error appears twice in one session; you abandon an approach; a dependency or CLI behaves against its docs; you learn by reading a convention the code does not state. Do NOT trigger for a read-only question, an exploration that changed no files, a formatting or rename pass, a clean change that went exactly as expected, generic programming knowledge, a one-off unlikely to recur, or a lesson already written in README.md, TESTING.md, AGENTS.md, docs/ or an INSIGHTS.md."
 allowed-tools: Read, Edit, Glob, Grep
 ---
 

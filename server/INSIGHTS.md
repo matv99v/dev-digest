@@ -26,6 +26,11 @@ _No entries yet._
 
 ## Codebase Patterns
 
+### 2026-09-05 — A wire DTO built from a persisted row doesn't necessarily carry every column that row has
+**Cause:** `PrIntentDetail` (`vendor/shared/contracts/intent.ts`) extends `PrIntentRecord` with `confidence`/`sources`/`derived_from_sha`/`derived_at`/`model`/`provider`/`stale` but deliberately omits `tokens_in`/`tokens_out`/`cost_usd`, even though the persisted `pr_intent` row has all three — R11 keeps them off the wire and off `agent_runs` on purpose (one shared derive call has no correct per-run share of cost). Assuming the DTO mirrors the row 1:1 and reading `detail.tokensIn` off `IntentService.deriveForRun`'s return failed at `tsc`, not at review time.
+**Rule:** when a service method needs a persisted column that isn't on the corresponding wire contract, widen that method's own return type with the extra raw-row fields alongside the DTO — don't assume "the DTO has what the row has" and don't add the column to the contract just to unblock one internal caller.
+**Evidence:** `src/modules/intent/service.ts` `deriveForRun()` (returns `{ intent, detail, tokensIn, tokensOut, costUsd }`, not just `detail`); `src/vendor/shared/contracts/intent.ts` (`PrIntentDetail`'s field list); `src/modules/reviews/run-executor.ts` (`intent: ${derived.detail.confidence}… ${tokensIn}→${tokensOut} tok` — reads tokens off `derived`, confidence off `derived.detail`).
+
 ### 2026-09-01 — A repository that must run inside a service-opened transaction can't just take `Db`
 **Cause:** No module before `conventions` actually called `db.transaction(...)` — every
 existing repository is constructed with the plain `Db` (`PostgresJsDatabase<typeof schema>`)

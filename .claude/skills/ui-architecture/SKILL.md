@@ -1,15 +1,6 @@
 ---
 name: ui-architecture
-description: >-
-  Decides where frontend code goes in the DevDigest client — the App Router tree,
-  colocation in _components/, when code is promoted to src/components/ or src/lib/,
-  file and folder naming, import direction and path aliases, barrel files as public
-  API, how to split an overgrown component, and where business logic lives. Use
-  whenever adding, moving, splitting or reviewing anything under client/: a new route
-  or page, a component, a hook, a constant, a helper, a style object, a type, or a
-  test. Consult it before creating any new file in client/, even when the task looks
-  small enough to place by eye — placing files by eye is exactly how the
-  inconsistency already in the tree got there.
+description: "Decides where frontend code goes in the DevDigest client — the App Router tree, colocation in _components/, when code is promoted to src/components/ or src/lib/, file and folder naming, import direction and path aliases, barrel files as public API, how to split an overgrown component, and where business logic lives. Use whenever adding, moving, splitting or reviewing anything under client/: a new route or page, a component, a hook, a constant, a helper, a style object, a type, or a test. Consult it before creating any new file in client/, even when the task looks small enough to place by eye — placing files by eye is exactly how the inconsistency already in the tree got there."
 version: 1.2.0
 ---
 

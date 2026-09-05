@@ -1,11 +1,4 @@
 {
-  "permissions": {
-    "deny": [
-      "Read(./server/clones/**)",
-      "Read(./**/.next/**)",
-      "Read(./**/dist/**)"
-    ]
-  },
   "hooks": {
     "PreToolUse": [
       {

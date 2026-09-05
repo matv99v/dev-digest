@@ -1,6 +1,8 @@
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
+import type { IntentRow, UpsertIntentInput } from './repository/pull.repo.js';
+export type { IntentRow, UpsertIntentInput };
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -37,6 +39,10 @@ export class ReviewRepository {
 
   getPrFiles(prId: string): Promise<(typeof t.prFiles.$inferSelect)[]> {
     return pullRepo.getPrFiles(this.db, prId);
+  }
+
+  getPrCommits(prId: string): Promise<(typeof t.prCommits.$inferSelect)[]> {
+    return pullRepo.getPrCommits(this.db, prId);
   }
 
   // ---- reviews + findings -------------------------------------------------
@@ -139,13 +145,20 @@ export class ReviewRepository {
   }
 
   // ---- intent -------------------------------------------------------------
+  // See the docblock above `upsertIntent`/`getIntent`/`getIntentRow` in
+  // `./repository/pull.repo.ts` for why `pr_intent` carries no `workspace_id`
+  // and where the tenancy boundary is actually enforced instead.
 
-  upsertIntent(prId: string, intent: Intent): Promise<void> {
-    return pullRepo.upsertIntent(this.db, prId, intent);
+  upsertIntent(prId: string, values: UpsertIntentInput): Promise<void> {
+    return pullRepo.upsertIntent(this.db, prId, values);
   }
 
   getIntent(prId: string): Promise<Intent | undefined> {
     return pullRepo.getIntent(this.db, prId);
+  }
+
+  getIntentRow(prId: string): Promise<IntentRow | undefined> {
+    return pullRepo.getIntentRow(this.db, prId);
   }
 
   // ---- observability: agent_runs + run_traces ----------------------------

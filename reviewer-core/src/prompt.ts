@@ -35,6 +35,8 @@ export function wrapUntrusted(label: string, content: string): string {
 
 /** Cap the PR description so a huge author body can't blow the token budget. */
 const MAX_PR_DESCRIPTION_CHARS = 4000;
+/** Cap the derived-intent section so it can't blow the token budget. */
+const MAX_INTENT_SECTION_CHARS = 2000;
 
 export interface PromptParts {
   /** Agent's system prompt (trusted). */
@@ -66,6 +68,14 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * Derived PR intent (L03) — a model-produced claim about what the PR is
+   * trying to do, grounded in evidence gathered server-side. Untrusted (it is
+   * ultimately derived from author-controlled text) — delimiter-wrapped.
+   * Rendered right after `## PR description`, before the trusted skills/rules
+   * the reviewing model applies. Empty / undefined → section omitted.
+   */
+  intent?: string;
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -101,10 +111,18 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
       ? parts.prDescription.slice(0, MAX_PR_DESCRIPTION_CHARS)
       : undefined;
 
+  const intent =
+    parts.intent && parts.intent.trim().length > 0
+      ? parts.intent.slice(0, MAX_INTENT_SECTION_CHARS)
+      : undefined;
+
   const userSections: string[] = [];
   if (parts.task) userSections.push(parts.task);
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
+  }
+  if (intent) {
+    userSections.push(`## Intent\n${wrapUntrusted('intent', intent)}`);
   }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
@@ -134,6 +152,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    intent: parts.intent ?? null,
     user,
   };
 

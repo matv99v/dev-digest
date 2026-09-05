@@ -104,6 +104,28 @@ describe('reviewPullRequest (engine)', () => {
     ).rejects.toThrow('cancelled');
   });
 
+  it('map-reduce mode: intent survives onto outcome.assembly (promptParts is built once and reused per chunk)', async () => {
+    const multiFileDiff =
+      'diff --git a/src/config.ts b/src/config.ts\n--- a/src/config.ts\n+++ b/src/config.ts\n@@ -10,3 +10,4 @@\n   port: 3000,\n+  stripeKey: "sk_live_xxx",\n   redisUrl: x,\n' +
+      'diff --git a/src/other.ts b/src/other.ts\n--- a/src/other.ts\n+++ b/src/other.ts\n@@ -1,2 +1,3 @@\n export const a = 1;\n+export const b = 2;\n';
+    const clean = { verdict: 'approve', summary: 'looks good', score: 10, findings: [] };
+    const llm = new MockLLMProvider('openai', { structured: clean });
+    const diff = await new MockGitClient({ diff: multiFileDiff }).diff();
+
+    const outcome = await reviewPullRequest({
+      systemPrompt: 'security reviewer',
+      model: 'gpt-4.1',
+      diff,
+      llm,
+      strategy: 'map-reduce',
+      intent: 'Add rate limiting to prevent abuse of public endpoints.',
+    });
+
+    expect(outcome.mode).toBe('map-reduce');
+    expect(outcome.chunks.length).toBeGreaterThan(1);
+    expect(outcome.assembly.intent).toBe('Add rate limiting to prevent abuse of public endpoints.');
+  });
+
   it('forwards sessionId to every LLM call (OpenRouter session grouping)', async () => {
     const seen: (string | undefined)[] = [];
     const recorder: LLMProvider = {

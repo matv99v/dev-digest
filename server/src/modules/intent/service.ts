@@ -80,35 +80,44 @@ export class IntentService {
    *
    * NEVER throws (R7) — a derivation failure must degrade the prompt (no
    * `## Intent` section), never fail the run. The executor additionally
-   * wraps this call in its own try/catch as defense in depth; this method's
-   * own catch is what the acceptance criterion actually verifies.
+   * wraps this call in its own try/catch as defense in depth.
    *
-   * Returns the raw row's tokens/cost alongside `detail` for the Live Log
-   * line ONLY — `PrIntentDetail` (the wire contract) deliberately omits them
-   * per R11 (they're persisted on `pr_intent`, never on any `agent_runs` row).
+   * Returns a discriminated result rather than `null` on failure so the
+   * caller's Live Log line can name what went wrong — a bare `null` made
+   * every derive failure indistinguishable from "nothing to log", so the
+   * executor's own failure-log branch could never fire (see server/INSIGHTS.md).
+   *
+   * `ok: true`'s tokens/cost sit alongside `detail` for the Live Log line
+   * ONLY — `PrIntentDetail` (the wire contract) deliberately omits them per
+   * R11 (they're persisted on `pr_intent`, never on any `agent_runs` row).
    */
   async deriveForRun(
     workspaceId: string,
     pull: PullRow,
     repo: { owner: string; name: string },
-  ): Promise<{
-    intent: string;
-    detail: PrIntentDetail;
-    tokensIn: number | null;
-    tokensOut: number | null;
-    costUsd: number | null;
-  } | null> {
+  ): Promise<
+    | {
+        ok: true;
+        intent: string;
+        detail: PrIntentDetail;
+        tokensIn: number | null;
+        tokensOut: number | null;
+        costUsd: number | null;
+      }
+    | { ok: false; reason: string }
+  > {
     try {
       const { detail, row } = await this.deriveFor(workspaceId, pull, repo, false);
       return {
+        ok: true,
         intent: detail.intent,
         detail,
         tokensIn: row.tokensIn,
         tokensOut: row.tokensOut,
         costUsd: row.costUsd,
       };
-    } catch {
-      return null;
+    } catch (err) {
+      return { ok: false, reason: (err as Error).message };
     }
   }
 

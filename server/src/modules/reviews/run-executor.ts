@@ -112,18 +112,23 @@ export class ReviewRunExecutor {
     // via `runLog.step`, which re-throws AND emits an `error` event that
     // would paint the Live Log red on a benign degradation) and logged as
     // `info`, matching the `callers digest: repoIntel failed — …` precedent
-    // below. `IntentService.deriveForRun` itself also never throws (R7); this
-    // try/catch is defense in depth, not the only guard.
+    // below. `IntentService.deriveForRun` itself also never throws (R7) — it
+    // returns `{ ok: false, reason }` instead of throwing, specifically so
+    // this catch block (defense in depth, not the only guard) still has a
+    // reason to log on the rare path where something upstream of it throws
+    // anyway.
     let intent: string | undefined;
     try {
       runLog.info('intent: deriving…');
       const derived = await new IntentService(this.container).deriveForRun(workspaceId, pull, repo);
-      if (derived) {
+      if (derived.ok) {
         intent = derived.intent;
         const { tokensIn, tokensOut, costUsd } = derived;
         const tokens = tokensIn != null && tokensOut != null ? ` — ${tokensIn}→${tokensOut} tok` : '';
         const cost = costUsd != null ? `, $${costUsd.toFixed(4)}` : '';
         runLog.info(`intent: ${derived.detail.confidence} confidence${tokens}${cost}`);
+      } else {
+        runLog.info(`intent: derivation failed — continuing without the Intent section (${derived.reason})`);
       }
     } catch (err) {
       runLog.info(`intent: derivation failed — continuing without the Intent section (${(err as Error).message})`);

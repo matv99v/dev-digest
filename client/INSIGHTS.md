@@ -22,6 +22,26 @@ _No entries yet._
 
 ## What Doesn't Work
 
+### 2026-09-06 — Forcing a child open by flipping its React `key` remounts the subtree and silently discards everything it held
+**Cause:** `FileCard` reads its initial open state at mount only, so `SmartDiffViewer` expanded a
+collapsed file by changing that card's `key` (`` `${path}:${forced|auto}` ``) — a remount whose new
+initial state is already `true`. It worked, and every acceptance test passed. But the key flips
+`auto → forced` on the *first* badge click whether or not the file was collapsed, so clicking the
+badge of an already-open file remounted it too, throwing away `InlineComposer`'s unsent draft,
+`CodeLine`'s `composing` flag and `CommentThreadView`'s `replying` flag. Nothing errors; a reviewer
+simply loses what they typed.
+**Rule:** never remount a component to change state it owns. Lift that state into an **optional**
+controlled prop (`open?` + `onOpenChange?`, uncontrolled fallback kept so existing callers are
+untouched) and share the default through a helper both sides call, so the controlling parent
+computes the same first value the child would have picked. A test for this must assert **node
+identity** — `expect(screen.getByText(...)).toBe(before)` — because a presence assertion passes
+across a remount and proves nothing.
+**Evidence:** `src/components/diff-viewer/FileCard/FileCard.tsx:60-67` (the controlled/uncontrolled
+pair) with `defaultOpenFor` in `src/components/diff-viewer/helpers.ts`; regression test
+*"a badge click does not remount the file's subtree"* in
+`src/components/diff-viewer/SmartDiffViewer/SmartDiffViewer.test.tsx`, confirmed to fail when the
+old key expression is restored.
+
 ### 2026-08-29 — A one-shot value consumed inside `useEffect` is silently emptied by StrictMode, in dev only
 **Cause:** `reactStrictMode: true` makes dev invoke every effect twice. An effect that both
 consumed a take-once value and stored it took the id on pass 1, then overwrote it with pass

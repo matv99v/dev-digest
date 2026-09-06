@@ -32,7 +32,7 @@ export type {
 } from "@devdigest/shared";
 
 export type { Review, Finding, Severity, Verdict } from "@devdigest/shared";
-export type { PrBrief, SmartDiff } from "@devdigest/shared";
+export type { PrBrief, SmartDiff, SmartDiffFile, SmartDiffGroup, SmartDiffRole } from "@devdigest/shared";
 export type {
   IntentConfidence,
   IntentSourceKind,

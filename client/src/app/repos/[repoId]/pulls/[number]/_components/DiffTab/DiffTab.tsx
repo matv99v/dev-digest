@@ -1,11 +1,13 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
-import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
+import { DiffViewer, SmartDiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
+import { usePrComments, useCreatePrComment, usePrReviews } from "@/lib/hooks/reviews";
+import { useSmartDiff } from "@/lib/hooks";
 import { notify } from "@/lib/toast";
-import type { PrFile } from "@devdigest/shared";
+import type { FindingRecord, PrFile } from "@devdigest/shared";
 
 interface DiffTabProps {
   prId: string | null;
@@ -16,10 +18,24 @@ interface DiffTabProps {
 }
 
 export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+  const t = useTranslations("shell");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   // Comments start hidden so the diff is clean by default — toggle to reveal.
   const [showComments, setShowComments] = React.useState(false);
+  // Original order is the default on every mount (R9) — never persisted.
+  const [smart, setSmart] = React.useState(false);
+
+  const { data: smartDiff } = useSmartDiff(prId);
+  // Severity/finding-id for Smart order's markers come from here — a cache
+  // hit on the same ["reviews", prId] key the rest of the PR page already
+  // populated (docs/plans/04-smart-diff.md, "Decisions taken against the
+  // obvious" #4), not a field on the SmartDiff contract itself.
+  const { data: reviews } = usePrReviews(prId);
+  const findings: FindingRecord[] = React.useMemo(
+    () => (reviews ?? []).flatMap((r) => r.findings),
+    [reviews],
+  );
 
   const commentCount = comments?.length ?? 0;
 
@@ -45,21 +61,36 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
       <SectionLabel
         icon="Code"
         right={
-          commentCount > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <Button
               kind="ghost"
               size="sm"
-              icon={showComments ? "EyeOff" : "Eye"}
-              onClick={() => setShowComments((v) => !v)}
+              active={smart}
+              aria-pressed={smart}
+              onClick={() => setSmart((v) => !v)}
             >
-              {showComments ? "Hide comments" : "Show comments"} ({commentCount})
+              {smart ? t("diffViewer.smart.toggleToOriginal") : t("diffViewer.smart.toggleToSmart")}
             </Button>
-          ) : undefined
+            {commentCount > 0 && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon={showComments ? "EyeOff" : "Eye"}
+                onClick={() => setShowComments((v) => !v)}
+              >
+                {showComments ? "Hide comments" : "Show comments"} ({commentCount})
+              </Button>
+            )}
+          </div>
         }
       >
         Files changed · {filesCount} files
       </SectionLabel>
-      <DiffViewer files={files} commenting={commenting} />
+      {smart ? (
+        <SmartDiffViewer groups={smartDiff?.groups ?? []} files={files} findings={findings} commenting={commenting} />
+      ) : (
+        <DiffViewer files={files} commenting={commenting} />
+      )}
     </section>
   );
 }

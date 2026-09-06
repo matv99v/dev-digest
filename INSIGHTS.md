@@ -24,6 +24,23 @@ quarterly; past ~30 entries, split by domain.
 
 ## What Doesn't Work
 
+### 2026-09-06 — An Acceptance line copied from an earlier plan named a test file that cannot produce the evidence it claims
+**Cause:** `docs/plans/04-smart-diff.md:414` made T4's Acceptance *"`pnpm exec vitest run
+test/routes-smoke.test.ts` sees `GET /pulls/:id/smart-diff` registered"* — copied in shape from
+`docs/plans/02-pr-intent-layer.md:466` ("sees both routes registered"). `server/test/routes-smoke.test.ts`
+holds four cases (`GET /health`, two `POST /settings/test-connection`, one 422 envelope) and **no
+route-registry assertion of any kind**, so no run of it can see any route registered. It passes
+regardless, which is exactly why nothing caught it: the implementer ran the named command, got a
+green suite, and reported the task met in good faith. Only `plan-verifier` — which opens the named
+file instead of trusting the command's exit code — found the line unverifiable as written.
+**Rule:** an Acceptance line must name a command **and** an assertion that command actually runs.
+Before writing "test X sees Y", open X and confirm the assertion is in it; a green suite is not
+evidence for a claim it never makes. This binds hardest when the line is lifted from a previous
+plan, where it reads as already-validated house style — the same failure as `routing.md`'s unchecked
+globs below, one artefact along.
+**Evidence:** `docs/plans/04-smart-diff.md:414` against `server/test/routes-smoke.test.ts:13-56`;
+the phrasing it came from at `docs/plans/02-pr-intent-layer.md:466`.
+
 ### 2026-09-04 — Citing a file to a subagent "for the house style" is how its *content* gets left out of the brief
 **Cause:** the `planner` brief pointed at `implementer.md` as "the house style for an agent body:
 frontmatter shape, `# Role`, hard rules, method, output template", and the briefer had read only

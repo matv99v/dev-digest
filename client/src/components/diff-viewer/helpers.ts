@@ -77,14 +77,18 @@ export function defaultOpenFor(file: Pick<PrFile, "additions" | "deletions">): b
 }
 
 /**
- * R11: a `boilerplate` file with findings starts collapsed even so; a
- * `core`/`wiring` file with findings starts expanded; everything else (no
- * findings, either role) falls back to `defaultOpenFor` — signalled by
- * returning `undefined`.
+ * R11: `boilerplate` always starts collapsed — with findings or without. The
+ * "without" half is load-bearing and was missing at first: a lock-file
+ * normally carries no findings at all, so leaving it to `defaultOpenFor`
+ * expanded every lock-file small enough to clear `AUTO_EXPAND_MAX_LINES`,
+ * which is the exact thing Smart order exists to stop. A `core`/`wiring`
+ * file with findings starts expanded; the same file without findings falls
+ * back to `defaultOpenFor` — signalled by returning `undefined`.
  */
 export function computeRoleOpen(role: SmartDiffRole, hasFindingLines: boolean): boolean | undefined {
+  if (role === "boilerplate") return false;
   if (!hasFindingLines) return undefined;
-  return role !== "boilerplate";
+  return true;
 }
 
 /** The first marked line for a file (R6 already returns `finding_lines`

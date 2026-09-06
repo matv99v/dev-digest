@@ -122,11 +122,20 @@ path talks to a model, to GitHub, or to a new table.
   `SmartDiffViewer.test.tsx` cases *"renders title, description and count per non-empty group"*,
   *"omits an empty group"*, *"renders patch lines for a joined file"*, *"skips a path absent from
   files"*.
-- **R11** — A `boilerplate` file starts **collapsed even when it carries findings**; a `core` or
-  `wiring` file with a non-empty `finding_lines` starts **expanded**; every other file keeps the
+- **R11** — A `boilerplate` file starts **collapsed, always** — with findings or without; a `core`
+  or `wiring` file with a non-empty `finding_lines` starts **expanded**; every other file keeps the
   existing `AUTO_EXPAND_MAX_LINES` rule. Verified by `SmartDiffViewer.test.tsx` cases *"a lock-file
   with findings starts collapsed"*, *"a core file with findings starts expanded"*, *"a large core
-  file with no findings starts collapsed"*.
+  file with no findings starts collapsed"* and *"a boilerplate file with no findings still starts
+  collapsed, however small"*.
+
+  > **Corrected after the fact.** This first read "collapsed **even when** it carries findings",
+  > which silently left a findings-free `boilerplate` file to `AUTO_EXPAND_MAX_LINES`. A lock-file
+  > normally carries no findings, so every lock-file under 200 changed lines rendered **expanded** —
+  > the one outcome the acceptance criterion "a lock-file is always boilerplate and always starts
+  > collapsed" names explicitly. Every fixture happened to give the lock-file a finding, so the
+  > whole suite passed and `plan-verifier` correctly reported R11 met against the wording above.
+  > Caught only by opening a real PR whose lock-file had no findings.
 - **R12** — A marked line renders a severity marker that is **icon + text, never colour alone**,
   taken from the highest-severity non-dismissed finding covering that line
   (`CRITICAL > WARNING > SUGGESTION`). Verified by `SmartDiffViewer.test.tsx` cases *"a CRITICAL

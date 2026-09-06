@@ -152,6 +152,32 @@ describe("SmartDiffViewer", () => {
     expect(screen.queryByText("big marker text line")).not.toBeInTheDocument();
   });
 
+  // Regression: `boilerplate` used to be collapsed only when it HAD findings,
+  // so a lock-file — which normally carries none — was expanded whenever it
+  // came in under AUTO_EXPAND_MAX_LINES. That is the one file Smart order most
+  // needs shut, so the role now wins outright.
+  it("a boilerplate file with no findings still starts collapsed, however small", () => {
+    renderWithIntl(
+      <SmartDiffViewer
+        groups={[
+          {
+            role: "boilerplate",
+            files: [
+              { path: "pnpm-lock.yaml", pseudocode_summary: null, additions: 2, deletions: 1, finding_lines: [] },
+            ],
+          },
+        ]}
+        files={FILES}
+        findings={[]}
+      />,
+    );
+
+    // 3 changed lines — far under AUTO_EXPAND_MAX_LINES, so the size rule alone
+    // would have opened it.
+    expect(screen.getByText("pnpm-lock.yaml")).toBeInTheDocument();
+    expect(screen.queryByText("lock added one")).not.toBeInTheDocument();
+  });
+
   it("a CRITICAL finding's line renders the Critical marker, a line covered by WARNING and CRITICAL renders Critical only, and an unmarked line renders no marker", () => {
     renderWithIntl(
       <SmartDiffViewer

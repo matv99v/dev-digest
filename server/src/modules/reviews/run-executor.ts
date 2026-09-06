@@ -8,6 +8,7 @@ import type { ReviewRepository, FindingRow, PullRow, ReviewRow } from './reposit
 import { REVIEW_STRATEGY } from './constants.js';
 import { taskLine, toSkillPromptBlocks } from './helpers.js';
 import { loadDiff } from './diff-loader.js';
+import { IntentService } from '../intent/service.js';
 
 /** Thrown by a run when the user cancels it mid-flight (between map files). */
 export class RunCancelledError extends Error {
@@ -105,6 +106,29 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // L03 — derive (or reuse a fresh cached) PR intent ONCE as shared
+    // pre-work, same footing as the diff load above. Best-effort: a
+    // derivation failure must never fail the run, so it's caught here (not
+    // via `runLog.step`, which re-throws AND emits an `error` event that
+    // would paint the Live Log red on a benign degradation) and logged as
+    // `info`, matching the `callers digest: repoIntel failed — …` precedent
+    // below. `IntentService.deriveForRun` itself also never throws (R7); this
+    // try/catch is defense in depth, not the only guard.
+    let intent: string | undefined;
+    try {
+      runLog.info('intent: deriving…');
+      const derived = await new IntentService(this.container).deriveForRun(workspaceId, pull, repo);
+      if (derived) {
+        intent = derived.intent;
+        const { tokensIn, tokensOut, costUsd } = derived;
+        const tokens = tokensIn != null && tokensOut != null ? ` — ${tokensIn}→${tokensOut} tok` : '';
+        const cost = costUsd != null ? `, $${costUsd.toFixed(4)}` : '';
+        runLog.info(`intent: ${derived.detail.confidence} confidence${tokens}${cost}`);
+      }
+    } catch (err) {
+      runLog.info(`intent: derivation failed — continuing without the Intent section (${(err as Error).message})`);
+    }
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -112,7 +136,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent);
         logger?.info(
           {
             runId,
@@ -144,6 +168,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent?: string,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -213,6 +238,11 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // L03 — derived PR intent, shared pre-work computed once above.
+        // Omitted (no `## Intent` section) when derivation was skipped or
+        // failed — assemblePrompt's omit-when-empty contract, same as
+        // callers/repoMap/prDescription above.
+        ...(intent ? { intent } : {}),
         // L02 — enabled linked skills, in order. Omitted (no `## Skills / rules`
         // section) when the agent has none attached, or all are disabled.
         ...(skillBlocks.length ? { skills: skillBlocks } : {}),

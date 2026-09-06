@@ -92,6 +92,13 @@
       "when": 1788287564196,
       "tag": "0012_ordinary_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788620155550,
+      "tag": "0013_stiff_cyclops",
+      "breakpoints": true
     }
   ]
 }

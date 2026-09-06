@@ -9,6 +9,8 @@
  *  - contracts/trace      RunTrace, RunEvent, RunLogLine (single-document trace)
  *  - contracts/platform   Settings, ConnTestResult, Repo, PrMeta/PrDetail, SpecFile, …
  *  - contracts/conventions Convention, ConventionScan, ConventionSkillDraft (L02 extractor)
+ *  - contracts/intent     IntentConfidence, IntentSourceKind, IntentSource,
+ *                         PrIntentDetail (L03 PR intent layer)
  *  - adapters             adapter interfaces + ModelInfo
  *
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
@@ -28,4 +30,5 @@ export * from './contracts/productionize.js';
 export * from './contracts/skills.js';
 export * from './contracts/agent-stats.js';
 export * from './contracts/conventions.js';
+export * from './contracts/intent.js';
 export * from './adapters.js';

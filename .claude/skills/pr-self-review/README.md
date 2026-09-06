@@ -25,49 +25,6 @@ the skills that actually govern it, and turns the result into a gate that stops 
 | **One `diff-hash.sh` for both sides** | The review stamps the hash and the hook re-checks it. Two implementations of "has the diff moved?" would drift, and the freshness check would be theatre |
 | **A required reason on the override** | `PR_SELF_REVIEW_OVERRIDE="reason"` keeps the escape hatch a decision rather than a reflex. A gate with no way out gets deleted |
 
-## Adapted from the reference implementation
-
-A working version of this skill exists in a parallel checkout of this project
-(`../orig-dev-digest`, branch `lesson-2-lab/skills`). It was adapted rather than copied.
-
-**Taken from it:** the deterministic-gates-first ordering, adversarial verification, the
-closed CRITICAL catalogue, the `// pr-self-review-ignore:` suppression, the contract-drift
-check, the fail-open hook, the single shared `diff-hash.sh`, intercepting all three of the
-push / PR-open / PR-merge commands, feeding each subagent the touched package's `INSIGHTS.md`,
-and the small-diff inline path.
-
-**Changed, with reasons:**
-
-- Its `CRITICAL / HIGH / MEDIUM` scale was dropped for the product's own
-  `CRITICAL / WARNING / SUGGESTION`, per the decision table above. Its mapping table survives,
-  retargeted onto the real enum.
-- Its skill map routes to `vercel-react-best-practices` and `nodejs-best-practices`, which
-  exist in neither checkout, and to `react-architecture-analyzer` / `code-reviewer` subagents,
-  when neither checkout has a `.claude/agents/` at all. Its `frontend-architecture` is this
-  checkout's `ui-architecture`. Routing to a skill that is not installed makes a run silently
-  review less than it claims, so every row here was checked against `.claude/skills/`.
-- Its gate table says "typecheck — always (every package defines it)" and calls the package's
-  own `test` script. Here the package manager differs per package, and `server/package.json`
-  is `skip-worktree`, so its scripts are not what runs — CI invokes vitest directly. `gate.md`
-  now lists the per-package command CI actually uses.
-
-**Three things it does not account for, all found by testing this tree:**
-
-1. **Substring matching on the command fires on any command that merely mentions the trigger
-   words.** The reference matches `*"git push"*` against the raw command, so writing
-   documentation about the gate, grepping for it, or echoing a reminder all trip it. This one
-   bit immediately — the first attempt to write this very README was blocked by the hook,
-   because the file content contains the words. `check-gate.sh` now strips heredoc bodies and
-   comments, then requires the verb at the start of a command segment.
-2. **Four contract pairs already differ** — `eval-ci.ts`, `knowledge.ts`, `productionize.ts`
-   and `trace.ts` (the server copy carries an `openrouter` provider and an `AgentManifest` the
-   client copy lacks). A whole-tree drift comparison would therefore open with four CRITICALs
-   on every PR. The check is scoped to contracts the diff touches.
-3. **The state file must be git-ignored, or no PASS can ever match.** `.pr-self-review.json`
-   is untracked, so while it was visible to `git ls-files --others` it fed its own diff hash:
-   writing the receipt changed the hash the receipt had just recorded, and every run came back
-   stale. Fixed in `.gitignore`, with the reason written next to the entry.
-
 ## Testing
 
 `scripts/check-gate.sh` was exercised across its whole decision matrix:
@@ -89,7 +46,6 @@ run as a benchmark.
 
 | Source | Taken |
 |---|---|
-| `../orig-dev-digest/.claude/skills/pr-self-review/` | The mechanics listed above |
 | `docs/agent-prompts/README.md` | Severity vocabulary, the anti-inflation rule, the score formula, "no findings ⇒ approve" |
 | `server/src/vendor/shared/contracts/findings.ts` | `Severity`, `Verdict`, the finding shape |
 | `.claude/skills/onion-architecture/references/review-checklist.md` | The seven backend checks and the "looks like a violation, isn't" list used during verification |

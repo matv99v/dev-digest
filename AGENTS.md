@@ -45,8 +45,6 @@ Four standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`.
   `ERR_MODULE_NOT_FOUND`.
 - A new path alias needs **two** edits — `tsconfig.json` *and* `vitest.config.ts` (there
   is no workspace resolver to inherit from). Sometimes a third: that workflow's `paths:`
-  filter.
-- **No linter or formatter exists.** Match the style of the file you are editing.
 
 ## Never
 

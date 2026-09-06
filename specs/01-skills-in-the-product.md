@@ -57,17 +57,6 @@ entirely to *feed* that existing plumbing, not to build new plumbing:
 - **New agents.** Only `Test Quality Reviewer` is added. The API-contract control
   experiment runs on the existing `General Reviewer` with an `api-contract-guard` skill
   attached, rather than adding a second new agent.
-- **Reference implementation.** A working version of this feature exists in a parallel
-  checkout (`../orig-dev-digest`, branch `lesson-2-lab/skills`) and was adapted, not
-  copied — see that repo's `INSIGHTS.md` for the rule. Kept: the route list and the
-  `/skills/import`-before-`/skills/:id` registration order, the body-change-bumps-version
-  rule, `SKILL.md`-first zip resolution, first-`#`-heading name fallback. Changed:
-  import parsing moved into a pure, unit-testable `helpers.ts` function instead of living
-  in the service; wrapping is by skill `source` instead of every body being injected
-  unwrapped; `list()` is sorted by name so the left rail doesn't reorder between loads;
-  `/skills/import` gets its own `bodyLimit` so a legitimate 5&nbsp;MB archive doesn't hit
-  the server's global 1&nbsp;MB body cap after base64 inflation; an `accept_rate` stat was
-  added.
 
 ## Files touched
 

@@ -74,11 +74,3 @@ from it — the rest of each source is out of scope here.
 | [Redux Style Guide](https://redux.js.org/style-guide/) | Feature folders with single-file logic; keep state minimal and derive the rest; structure state by data type, not by component |
 | [Martin Fowler — PresentationDomainDataLayering](https://martinfowler.com/bliki/PresentationDomainDataLayering.html) | The domain must not depend on presentation; past a certain size, modularise by domain first and layer *within* each module |
 | [Anthropic — Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) | Progressive disclosure — hub under 500 lines, references one level deep, table of contents on longer files; third-person description carrying its own triggers; explain the reason instead of stacking imperatives |
-
-### Adapted from a sibling skill
-
-Version 1.2.0 merged the judgment-oriented material — split signals, composition, state
-colocation, hook extraction, the helpers/utils distinction, size thresholds — from the
-`frontend-architecture` skill in the `orig-dev-digest` checkout, rewritten against this
-repo's actual conventions. Its own bibliography (~90 further links) is where to look for
-the general React/Next structure literature this file does not duplicate.

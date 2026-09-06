@@ -90,21 +90,12 @@ If an agent genuinely navigates wrong, fix `AGENTS.md`; do not patch around it i
 **Evidence:** `.claude/agents/researcher.md:73-77` — the project-mode method is three lines
 and names no package, no path and no prohibition.
 
-### 2026-08-31 — A skill's `description` is its entire trigger, and it under-covers its own body silently
-**Cause:** `engineering-insights` had seven sections in its body but a `description` naming
-four kinds of finding. `What Works`, `Codebase Patterns` and `Open Questions` were
-unreachable — a session that only surfaced a convention, or only left an open question, never
-invoked the skill, and nothing looked wrong from inside the file. The gap is visible only by
-diffing the trigger clauses against the body; reviewing either half on its own misses it.
-**Rule:** after editing any `SKILL.md`, map the `description`'s trigger clauses 1:1 onto the
-branches the body handles — its sections, its routing rows, its ranked categories. Every
-branch the body can handle needs a phrase that reaches it, and literal user phrasings ("wrap
-up", "retro") belong in the text rather than left to paraphrase matching. Editing the body is
-exactly when the `description` goes stale, because the body is what you are looking at.
-**Evidence:** `.claude/skills/engineering-insights/SKILL.md:3` against its Step 5 table at
-`.claude/skills/engineering-insights/SKILL.md:117`.
-
 ## Tool & Library Notes
+
+### 2026-09-06 — Whether a newly written `.claude/agents/*.md` is invocable in the same session is **not stable either way** — this refines both entries below
+**Cause:** three new agent files (`brainstorm`, `investigator`, `insight-curator`) were written into an **existing** `.claude/agents/` that already held seven, `claude plugin validate .claude/agents` exited 0, and all three invocations still returned `Agent type 'x' not found. Available agents: architecture-reviewer, claude, claude-code-guide, doc-writer, Explore, general-purpose, implementer, Plan, plan-verifier, planner, researcher, statusline-setup, test-writer` — the seven committed agents, no new ones. A second attempt minutes later returned the same list. So the 2026-09-04 entry below is too broad in the other direction: on 2026-09-04 four new files became available immediately; on 2026-09-06 three did not, in the same repo, with the directory already populated — which is *not* the documented "first agent file in a new `agents` directory" exception. What differs between the two runs was not established.
+**Rule:** treat same-session invocability as **unknown until you try it** — neither "restart required" nor "hot-reload works" is a property you may assume. Keep writing the invocation as the check (that part of the entry below holds), and when it returns `Agent type 'x' not found`, record it as this-run evidence about the roster and **stop there**: validate exited 0, the frontmatter is not the cause, and editing the file in response is the actual trap. A plan whose Acceptance requires a live invocation must state that outcome as a legitimate result, not as a failure to fix.
+**Evidence:** `.claude/agents/investigator.md:1-5` written and validated this session; the "not found" list above names only the seven files from commit `e972b72`. Refines `INSIGHTS.md:109` and `INSIGHTS.md:141`.
 
 ### 2026-09-04 — A newly written `.claude/agents/*.md` **is** invocable in the session that wrote it — this supersedes the entry below
 **Cause:** the earlier entry ("A new `.claude/agents/*.md` cannot be invoked in the session that
@@ -152,21 +143,6 @@ invocation needs a new session, rather than editing the file in response to "not
 trap as skills: creating the definition is not the same as loading it.
 **Evidence:** `.claude/agents/researcher.md:1-18`.
 
-### 2026-09-01 — A rarely-invoked skill loses its `description` to the listing budget, which makes it rarer still
-**Cause:** `engineering-insights` under-triggered, and the wording was only half of it. Claude
-Code loads a listing of every skill name plus description budgeted at 1% of the context window,
-and when that overflows it drops descriptions **starting with the skills you invoke least**.
-With ~30 skills installed here, the skill that fires least is first to lose the text that makes
-it fire, so under-triggering feeds itself and the file looks fine from the inside.
-**Rule:** front-load the trigger, do not pad. A `SKILL.md` may also carry `when_to_use:` — a
-separate frontmatter field appended *after* `description` in the listing; both share one
-1,536-char cap and truncation eats the tail, so put the imperative ("ALWAYS invoke when…") in
-`description` and the trigger phrases and negative triggers in `when_to_use`, where losing them
-costs least. Run `claude plugin validate .claude/skills` after any frontmatter edit: a
-malformed `>-` block loads the body with **no** description at all, and that failure is
-indistinguishable from ordinary under-triggering.
-**Evidence:** `.claude/skills/engineering-insights/SKILL.md:3-24`.
-
 ### 2026-08-31 — A `PreToolUse` Bash hook that substring-matches the command fires on any command that merely mentions it
 **Cause:** the gate matched `case "$cmd" in *"git push"*)`. The Bash tool hands the hook the
 *whole* command string, heredoc bodies included, so writing a file whose **content** contained
@@ -180,7 +156,10 @@ only ever sees real invocations looks correct right up until someone documents i
 
 ## Recurring Errors & Fixes
 
-_No entries yet._
+### 2026-09-05 — A superseded `INSIGHTS.md` entry gets re-cited as fact, because the correction sits above it and the stale entry reads as self-contained
+**Cause:** a `researcher` subagent, asked to establish this repo's agent-authoring conventions, quoted `INSIGHTS.md:141` ("a new `.claude/agents/*.md` cannot be invoked in the session that wrote it") into its report as an established fact with a locator. The correction is `INSIGHTS.md:109` — same section, 32 lines above, heading ending "this supersedes the entry below" — and the researcher never reached it: a Grep lands on the matching entry, and that entry carries nothing saying it is dead, because append-only forbids editing it. Second time this same false rule has propagated into a planning artefact; `docs/plans/01-agent-suite-four-subagents.md` was the first, and the superseding entry already records that.
+**Rule:** treat any `INSIGHTS.md` entry as provisional until you have read the rest of its section top-down — newest first, so a supersession is always *above* the entry it kills, and the stale entry can carry no back-reference to it. A Grep hit alone is not a citation. This binds hardest on a read-only subagent, whose report becomes the caller's ground truth without the caller re-reading the source.
+**Evidence:** `INSIGHTS.md:109` supersedes `INSIGHTS.md:141`; both sit in `## Tool & Library Notes`.
 
 ## Session Notes
 

@@ -13,6 +13,10 @@ what already cost someone time there. Then check the rest of *Use when* for the 
 Say in one line what you took from them before you start. Don't rediscover from source
 what someone already wrote down.
 
+`INSIGHTS.md` is **append-only**: a wrong entry is never edited or deleted, only outranked
+by a newer one *above* it in the same section. Read the whole section before citing an
+entry — a Grep hit on a stale entry looks exactly like a live one.
+
 ## Repo shape
 
 Four standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`.

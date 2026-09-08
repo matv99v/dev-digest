@@ -30,6 +30,44 @@ import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
 export const DEFAULT_MAP_THRESHOLD_LINES = 400;
 /** Default structured-output reprompt retries (matches REVIEW_MAX_RETRIES). */
 export const DEFAULT_REVIEW_MAX_RETRIES = 2;
+/**
+ * Default output ceiling for a single `completeStructured` call, in tokens.
+ * This is a PER-CALL ceiling, not a per-review budget: the map-reduce path
+ * issues one call per file, so a large multi-file diff can still spend a
+ * multiple of this across the whole run.
+ *
+ * Deliberately generous, because on a reasoning model `max_tokens` bounds
+ * reasoning + content, not content. Measured over 47 completed runs against
+ * `deepseek-v4-flash`, the emitted review body never exceeded ~1.5k tokens,
+ * while billed completion tokens for those same runs ranged from 151 to
+ * 231_197 - a spread of three orders of magnitude driven by how long the
+ * model thought, not by how much it found. A ceiling tight enough to bound
+ * the body would therefore truncate healthy runs: 11 of those 47 (7 of them
+ * single-pass, several carrying real findings) billed more than 8192.
+ *
+ * 64_000 sits above the largest single-pass run observed (46_091) and below
+ * the runaway cluster (134_670 / 136_763 / 231_197), so it fires as a runaway
+ * guard and not as a routine cap. Streaming is what actually keeps the
+ * transport alive; this is the second line, and a second line that trips on
+ * healthy traffic is worse than none.
+ */
+export const DEFAULT_REVIEW_MAX_OUTPUT_TOKENS = 64_000;
+/**
+ * Default wall-clock budget for a single `completeStructured` call, in
+ * milliseconds. Like the token ceiling above, this bounds one call - the
+ * map-reduce path can still run for a multiple of this across all its
+ * per-file calls.
+ *
+ * Chosen from the observed gap rather than from a token-rate estimate. Across
+ * the same 47 completed runs, every success finished within 622_298ms except
+ * three runaways (2_290_928 / 2_685_941 / 5_354_347), while every transport
+ * failure landed between 975_446ms and 1_102_692ms. Nothing at all sits
+ * between 622s and 975s, so 900_000ms clears the slowest healthy run by a
+ * wide margin and still fires before the band where the socket dies on its
+ * own - which is the point: a run should end with this error naming its
+ * budget, not with an undici read error naming nothing.
+ */
+export const DEFAULT_LLM_TIMEOUT_MS = 900_000;
 
 export type ReviewStrategy = 'auto' | 'single-pass' | 'map-reduce';
 export type ReviewMode = 'single-pass' | 'map-reduce';
@@ -81,6 +119,18 @@ export interface ReviewInput {
   /** Override the map-reduce line threshold. */
   mapThresholdLines?: number;
   /**
+   * Override the per-call output ceiling (default DEFAULT_REVIEW_MAX_OUTPUT_TOKENS).
+   * Applies to each `completeStructured` call individually — in map-reduce
+   * mode that means per file, not per review.
+   */
+  maxOutputTokens?: number;
+  /**
+   * Override the per-call wall-clock budget, in ms (default DEFAULT_LLM_TIMEOUT_MS).
+   * Applies to each `completeStructured` call individually — in map-reduce
+   * mode that means per file, not per review.
+   */
+  llmTimeoutMs?: number;
+  /**
    * OpenRouter session id — forwarded on every LLM call so all chunks of this
    * review group into one session in the OpenRouter dashboard.
    */
@@ -93,6 +143,15 @@ export interface ReviewInput {
    * type, e.g. the server's RunCancelledError); the engine stays agnostic.
    */
   checkCancelled?: () => void;
+  /**
+   * Usage sink, fired after each successful chunk AND when a chunk's
+   * `completeStructured` call throws an error that carries numeric
+   * `tokensIn`/`tokensOut` own properties (e.g. OpenRouterProvider's
+   * StructuredCallError) — so tokens genuinely consumed by a failed call are
+   * still attributed. The caller (server) accumulates these to record real
+   * usage on a failed run instead of hard zeros.
+   */
+  onUsage?: (u: { tokensIn: number; tokensOut: number; costUsd: number | null }) => void;
 }
 
 export interface ReviewOutcome {
@@ -129,6 +188,15 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   const mode = selectMode(input.strategy ?? 'auto', input.diff, threshold);
   const emit = (kind: RunEventKind, msg: string, data?: unknown) =>
     input.onEvent?.({ kind, msg, data });
+  // Guarded the same way `emit` guards `onEvent` — onUsage must never throw
+  // into the run, and a throwing sink shouldn't crash it or mask the real error.
+  const reportUsage = (u: { tokensIn: number; tokensOut: number; costUsd: number | null }) => {
+    try {
+      input.onUsage?.(u);
+    } catch {
+      // ignore — a broken sink must not affect the review outcome.
+    }
+  };
 
   const promptParts = {
     system: input.systemPrompt,
@@ -175,19 +243,42 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     );
     const a = assemblePrompt({ ...promptParts, diff: chunk.diffText });
     if (mode === 'single-pass') assembly = a.assembly;
-    const res = await input.llm.completeStructured<Review>({
-      model: input.model,
-      schema: ReviewSchema,
-      schemaName: 'Review',
-      messages: a.messages,
-      maxRetries,
-      ...(input.sessionId ? { sessionId: input.sessionId } : {}),
-    });
+    let res;
+    try {
+      res = await input.llm.completeStructured<Review>({
+        model: input.model,
+        schema: ReviewSchema,
+        schemaName: 'Review',
+        messages: a.messages,
+        maxRetries,
+        maxTokens: input.maxOutputTokens ?? DEFAULT_REVIEW_MAX_OUTPUT_TOKENS,
+        timeoutMs: input.llmTimeoutMs ?? DEFAULT_LLM_TIMEOUT_MS,
+        ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      });
+    } catch (err) {
+      // A provider (e.g. OpenRouterProvider's StructuredCallError) may attach
+      // usage accumulated across completed round-trips before it had to give
+      // up. Read those fields STRUCTURALLY — no `instanceof`, since that
+      // provider's error class is deliberately not exported from
+      // src/index.ts — and report them before rethrowing the ORIGINAL error
+      // unchanged, so `err instanceof RunCancelledError` still holds for the
+      // caller (server's run-executor.ts).
+      const withUsage = err as { tokensIn?: unknown; tokensOut?: unknown; costUsd?: unknown };
+      if (typeof withUsage.tokensIn === 'number' && typeof withUsage.tokensOut === 'number') {
+        reportUsage({
+          tokensIn: withUsage.tokensIn,
+          tokensOut: withUsage.tokensOut,
+          costUsd: typeof withUsage.costUsd === 'number' ? withUsage.costUsd : null,
+        });
+      }
+      throw err;
+    }
     tokensIn += res.tokensIn;
     tokensOut += res.tokensOut;
     costUsd = costUsd == null || res.costUsd == null ? null : costUsd + res.costUsd;
     raws.push(res.raw);
     partials.push(res.data);
+    reportUsage({ tokensIn: res.tokensIn, tokensOut: res.tokensOut, costUsd: res.costUsd });
     emit('result', `${chunk.label}: ${res.data.findings.length} candidate finding(s)`);
   }
 

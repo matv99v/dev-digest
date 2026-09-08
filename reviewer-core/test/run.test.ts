@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import type { LLMProvider, StructuredResult } from '@devdigest/shared';
+import type { LLMProvider, StructuredRequest, StructuredResult } from '@devdigest/shared';
 import { MockLLMProvider, MockGitClient } from '../../server/src/adapters/mocks.js';
-import { reviewPullRequest } from '../src/index.js';
+import {
+  reviewPullRequest,
+  DEFAULT_REVIEW_MAX_OUTPUT_TOKENS,
+  DEFAULT_LLM_TIMEOUT_MS,
+} from '../src/index.js';
 
 /**
  * Engine-level test for reviewPullRequest (the core lifted out of the server's
@@ -156,5 +160,103 @@ describe('reviewPullRequest (engine)', () => {
     await reviewPullRequest({ systemPrompt: 's', model: 'm', diff, llm: recorder, sessionId: 'sess-abc' });
     expect(seen.length).toBeGreaterThan(0);
     expect(seen.every((s) => s === 'sess-abc')).toBe(true);
+  });
+
+  function makeRecordingLLM(calls: StructuredRequest<unknown>[]): LLMProvider {
+    return {
+      id: 'openrouter',
+      async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
+        calls.push(req as StructuredRequest<unknown>);
+        return {
+          data: fixture as unknown as T,
+          model: req.model,
+          tokensIn: 0,
+          tokensOut: 0,
+          costUsd: 0,
+          raw: '',
+          attempts: 1,
+        };
+      },
+      async listModels() {
+        return [];
+      },
+      async complete() {
+        throw new Error('not used');
+      },
+      async embed() {
+        return [];
+      },
+    };
+  }
+
+  it('every completeStructured call carries the default output/timeout ceilings (R1, R2)', async () => {
+    const calls: StructuredRequest<unknown>[] = [];
+    const llm = makeRecordingLLM(calls);
+    const diff = await new MockGitClient().diff();
+
+    await reviewPullRequest({ systemPrompt: 's', model: 'gpt-4.1', diff, llm });
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls[0]!.maxTokens).toBe(DEFAULT_REVIEW_MAX_OUTPUT_TOKENS);
+    expect(calls[0]!.timeoutMs).toBe(DEFAULT_LLM_TIMEOUT_MS);
+  });
+
+  it('maxOutputTokens / llmTimeoutMs overrides are forwarded to every call (R1, R2)', async () => {
+    const calls: StructuredRequest<unknown>[] = [];
+    const llm = makeRecordingLLM(calls);
+    const diff = await new MockGitClient().diff();
+
+    await reviewPullRequest({
+      systemPrompt: 's',
+      model: 'gpt-4.1',
+      diff,
+      llm,
+      maxOutputTokens: 1234,
+      llmTimeoutMs: 5678,
+    });
+
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((c) => c.maxTokens === 1234)).toBe(true);
+    expect(calls.every((c) => c.timeoutMs === 5678)).toBe(true);
+  });
+
+  it('onUsage receives usage attached to a thrown error, and the original error still propagates (R7)', async () => {
+    // Mimics OpenRouterProvider's StructuredCallError: a plain error carrying
+    // tokensIn/tokensOut as own properties, accumulated before the provider
+    // had to give up.
+    class FakeUsageError extends Error {
+      tokensIn = 900;
+      tokensOut = 300;
+    }
+    const failing: LLMProvider = {
+      id: 'openrouter',
+      async completeStructured(): Promise<StructuredResult<unknown>> {
+        throw new FakeUsageError('OpenRouter request exceeded budget');
+      },
+      async listModels() {
+        return [];
+      },
+      async complete() {
+        throw new Error('not used');
+      },
+      async embed() {
+        return [];
+      },
+    };
+    const diff = await new MockGitClient().diff();
+    const usages: { tokensIn: number; tokensOut: number; costUsd: number | null }[] = [];
+
+    await expect(
+      reviewPullRequest({
+        systemPrompt: 's',
+        model: 'gpt-4.1',
+        diff,
+        llm: failing,
+        onUsage: (u) => usages.push(u),
+      }),
+    ).rejects.toThrow('OpenRouter request exceeded budget');
+
+    expect(usages).toHaveLength(1);
+    expect(usages[0]).toEqual({ tokensIn: 900, tokensOut: 300, costUsd: null });
   });
 });

@@ -55,12 +55,20 @@ export interface MockLLMOptions {
   embedding?: number[];
 }
 
+/**
+ * This fake replaces `LLMProvider` WHOLESALE — it never makes a network call, never
+ * constructs the vendor SDK, and never exercises `OpenRouterProvider`'s streaming, abort,
+ * or truncation-guard logic (`src/llm/openrouter.ts` in `reviewer-core`). Constructing a
+ * `MockLLMProvider` with `id: 'openrouter'` only proves that `container.llm('openrouter')`
+ * resolves and that the server-side plumbing around the port works; it gives zero coverage
+ * of `OpenRouterProvider` itself — that lives in `reviewer-core/test/openrouter.test.ts`.
+ */
 export class MockLLMProvider implements LLMProvider {
-  readonly id: 'openai' | 'anthropic';
+  readonly id: 'openai' | 'anthropic' | 'openrouter';
   public calls: { method: string; req: unknown }[] = [];
 
   constructor(
-    id: 'openai' | 'anthropic' = 'openai',
+    id: 'openai' | 'anthropic' | 'openrouter' = 'openai',
     private opts: MockLLMOptions = {},
   ) {
     this.id = id;
@@ -68,11 +76,7 @@ export class MockLLMProvider implements LLMProvider {
 
   async listModels(): Promise<ModelInfo[]> {
     this.calls.push({ method: 'listModels', req: null });
-    return (
-      this.opts.models ?? [
-        { id: 'gpt-4.1', provider: this.id === 'anthropic' ? 'anthropic' : 'openai' },
-      ]
-    );
+    return this.opts.models ?? [{ id: 'gpt-4.1', provider: this.id }];
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {

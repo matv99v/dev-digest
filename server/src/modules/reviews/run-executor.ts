@@ -183,6 +183,14 @@ export class ReviewRunExecutor {
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
 
+    // Running totals, accumulated via `onUsage` below as chunks complete (and
+    // on a chunk that throws after already consuming tokens) — so a failed
+    // run's `agent_runs` row records what was actually billed instead of the
+    // hard zeros a mid-run failure used to leave behind (R7).
+    let tokensInSoFar = 0;
+    let tokensOutSoFar = 0;
+    let costSoFar: number | null = 0;
+
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
       // key is missing — caught below and persisted as a failed run.)
@@ -256,6 +264,14 @@ export class ReviewRunExecutor {
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
+        },
+        onUsage: (u) => {
+          tokensInSoFar += u.tokensIn;
+          tokensOutSoFar += u.tokensOut;
+          // Same null-poisoning rule the engine itself uses for costUsd
+          // (run.ts): once any chunk's cost is unknown, the running total is
+          // unknown rather than silently undercounting.
+          costSoFar = costSoFar == null || u.costUsd == null ? null : costSoFar + u.costUsd;
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
@@ -346,13 +362,23 @@ export class ReviewRunExecutor {
       const status = cancelled ? 'cancelled' : 'failed';
       const msg = cancelled ? 'Cancelled by user' : (err as Error).message;
       runLog.error(cancelled ? 'Run cancelled by user' : `Run failed: ${msg}`);
+      // Nothing was actually billed (no chunk completed or attached usage
+      // before the error) — costUsd is unknown/none, not a real $0.00, so it
+      // must render as "—" like every other free run, not $0.00.
+      const consumedAny = tokensInSoFar > 0 || tokensOutSoFar > 0;
+      if (consumedAny) {
+        runLog.info(
+          `Consumed ${tokensInSoFar}→${tokensOutSoFar} tok before ${cancelled ? 'cancellation' : 'failure'}` +
+            (costSoFar != null ? ` ($${costSoFar.toFixed(4)})` : ''),
+        );
+      }
       await this.repo
         .completeAgentRun(runId, {
           status,
           durationMs: Date.now() - start,
-          tokensIn: 0,
-          tokensOut: 0,
-          costUsd: null,
+          tokensIn: tokensInSoFar,
+          tokensOut: tokensOutSoFar,
+          costUsd: consumedAny ? costSoFar : null,
           findingsCount: 0,
           grounding: '0/0 passed',
           error: msg,

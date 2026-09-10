@@ -1,0 +1,62 @@
+# devdigest-mcp suite — the stdio MCP server (@devdigest/mcp).
+# A thin HTTP client over the DevDigest API; no DB, no GitHub, no LLM.
+# Tests are hermetic units (fetch is stubbed). Uses npm (package-lock.json).
+#
+# The path filter names devdigest-mcp/** and this file, and NOTHING under
+# server/. That is deliberate, and it is the payoff of the local-types decision
+# (plan 06, R14): this package declares its own narrow response types and has no
+# path alias into @devdigest/shared, so nothing in server/ can break its
+# type-check. Contrast reviewer-core.yml, which must watch
+# server/src/vendor/shared/** because it aliases straight into it.
+#
+# The `stdout discipline` step exists because stdout is the JSON-RPC channel
+# (R15). A stray console.log corrupts the protocol frame-for-frame: the server
+# still connects, the client still lists tools, and then a call simply never
+# returns — with no error at either end. There is nothing to catch at runtime,
+# so it is caught here instead. All output goes through src/log.ts (stderr).
+name: mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'devdigest-mcp/**'
+      - '.github/workflows/mcp.yml'
+  pull_request:
+    paths:
+      - 'devdigest-mcp/**'
+      - '.github/workflows/mcp.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: devdigest-mcp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: devdigest-mcp/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # Negated grep: a hit means a console.log landed in the package's source,
+      # so the step fails. Verified to bite on a planted line (plan 06, T11).
+      - name: stdout discipline
+        run: '! grep -rn "console.log(" src/ scripts/'

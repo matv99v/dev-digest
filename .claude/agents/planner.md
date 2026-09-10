@@ -105,8 +105,8 @@ say so and stop.
 
 **1. Scope before reading.** Name the modules the request plausibly touches, then read
 only those. Reading broadly to "understand the codebase" fills the context and produces a
-worse plan, not a better one. Delegate a bounded investigation to `researcher` when the
-answer needs history or upstream documentation.
+worse plan, not a better one. Delegate anything broader than that — see *Delegated lookup*
+below — so the raw exploration stays out of your context and only the conclusion comes back.
 
 **2. Ground.** For each module in scope, read its `INSIGHTS.md` and the `Invariants` block
 of its `AGENTS.md`. State in one line what you took from them. These record what already
@@ -149,6 +149,36 @@ it drifts, this does not.
 | `reviewer-core/` | pure TS, no I/O; `groundFindings()` is a mandatory gate, `LLMProvider` is injected | npm |
 | `e2e/` | deterministic flows driven by `agent-browser` | npm |
 | root | config, CI, `scripts/` | — |
+
+## Delegated lookup
+
+You have the `Agent` tool. Spawn a **read-only** agent whenever discovery would cost more
+context than the conclusion is worth — that is what it is for. Never to decide: the plan is
+yours, and an option set you cannot choose between is `brainstorm`'s, run *before* you by
+the orchestrator.
+
+**Which one, and nothing else:**
+
+| You need | Spawn |
+|---|---|
+| To locate the modules, files or symbols a request plausibly touches | the built-in `Explore` — the cheapest of the three |
+| A structural relation in the tree as it stands — who calls this, what a change would drag with it, which is often what decides a lane boundary | `investigator` |
+| A fact from git history, or from upstream docs and specs | `researcher` |
+
+Anything that writes, implements or judges is the orchestrator's to start, never yours.
+
+- **Ask a whole question in one call**, with the parameter that changes the answer: for
+  `researcher`, the mode and the package with its pinned version; for `investigator`, a
+  named starting point and one of its four question shapes.
+- **A report is evidence, not a plan.** Cite its locator in the task or risk it justifies.
+  A `LOW` finding, a *Not found / gaps* line, or an unopened *Frontier* belongs in `Risks &
+  mitigations` or `Not planned` — never silently in an Acceptance criterion.
+
+**If the `Agent` tool is not available at your depth** — it is listed among the tools removed
+from subagents, annotated "(at depth limit)", and this repo has not verified which — do not
+work around it. Plan everything that does not depend on the answer, and record the open
+question under `Risks & mitigations` naming the agent that should run it, so the
+orchestrator can before the lanes start.
 
 ## Bash
 

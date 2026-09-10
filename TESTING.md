@@ -1,6 +1,6 @@
 # Testing & CI strategy
 
-DevDigest is four independent packages (no workspace), so testing is organised
+DevDigest is five independent packages (no workspace), so testing is organised
 as **one suite per package**, each with its own CI workflow, runner, and path
 filter. A package's suite runs only when that package (or a package it depends
 on at type-check time) changes.
@@ -31,6 +31,7 @@ If a test wouldn't catch a class of regression we care about, we don't write it.
 | server-integration | `server/` | integration (real Postgres) | vitest | `server-integration.yml` | **yes** |
 | reviewer-core | `reviewer-core/` | unit (engine) | vitest | `reviewer-core.yml` | no |
 | e2e web | `e2e/` | browser e2e (deterministic) | agent-browser + `run.ts` | `e2e-web.yml` | yes (stack) |
+| mcp | `devdigest-mcp/` | unit | vitest | `mcp.yml` | no |
 
 ## What each suite covers
 
@@ -56,12 +57,20 @@ and a `run` with a stubbed model → grounded findings. No DB / GitHub / FS.
 main journeys (boot → PR list → PR detail; agents) against a real seeded stack.
 No `chat`, no model key.
 
+**mcp** — the stdio MCP server's five tools, its API error mapping, ref
+resolution and finding projection. Every test stubs `fetch`, so there is no API,
+DB, browser or key in the loop, and no `*.it.test.ts` in the package. The
+workflow also runs a **stdout guard** — `! grep -rn "console.log(" src/ scripts/`
+— because stdout is that package's JSON-RPC channel and a stray write corrupts
+the protocol with no runtime error to catch.
+
 ## Running locally
 
 ```sh
 # per package
 cd client        && pnpm test           # + pnpm typecheck
 cd reviewer-core && npm test
+cd devdigest-mcp && npm test            # + npm run typecheck
 
 # server — the unit/integration split (see note below)
 cd server && pnpm exec vitest run --exclude '**/*.it.test.ts'   # unit, no Docker

@@ -64,6 +64,33 @@ export const s = {
     color: "var(--text-primary)",
     paddingRight: 12,
   } satisfies CSSProperties,
+  // ---- SmartDiffViewer ----
+  smartGroup: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 } satisfies CSSProperties,
+  smartGroupHeader: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: 10,
+    marginBottom: 4,
+  } satisfies CSSProperties,
+  smartGroupTitle: { fontSize: 13, fontWeight: 700, color: "var(--text-primary)" } satisfies CSSProperties,
+  smartGroupDesc: { fontSize: 12, color: "var(--text-muted)", flex: 1 } satisfies CSSProperties,
+  findingBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontSize: 12,
+    color: "var(--text-muted)",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "2px 4px",
+  } satisfies CSSProperties,
+  unavailable: {
+    padding: "24px",
+    fontSize: 14,
+    color: "var(--text-muted)",
+    textAlign: "center",
+  } satisfies CSSProperties,
 } as const;
 
 /** Chevron rotates 90deg when the file card is open. */

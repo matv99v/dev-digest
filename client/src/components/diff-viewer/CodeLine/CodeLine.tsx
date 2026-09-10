@@ -3,22 +3,30 @@
 "use client";
 
 import React from "react";
+import { SeverityBadge } from "@devdigest/ui";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "@/components/diff-viewer/comments";
 import { type Line } from "@/components/diff-viewer/helpers";
 import { s, lineRowFor, lineSignFor } from "@/components/diff-viewer/styles";
 import { CommentThreadView } from "@/components/diff-viewer/CommentThreadView";
 import { InlineComposer } from "@/components/diff-viewer/InlineComposer";
+import type { Severity } from "@/lib/types";
 
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
+  marker,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** Smart order only: the highest-severity non-dismissed finding covering
+     this line (R12 — icon + text, never colour alone; reuses the existing
+     SeverityBadge rather than a second vocabulary). Also drives the
+     `data-finding-line` attribute the badge's scroll queries for. */
+  marker?: Severity;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -34,10 +42,12 @@ export function CodeLine({
   const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "−" : "";
   const target = commenting?.canComment ? commentTargetFor(ln) : null;
   const showAdd = hover && !!target && !composing;
+  const lineNo = ln.newNo ?? ln.oldNo;
 
   return (
     <div
       style={cs.rowWrap}
+      data-finding-line={marker && lineNo != null ? `${path}:${lineNo}` : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
@@ -54,7 +64,7 @@ export function CodeLine({
               +
             </button>
           )}
-          {ln.newNo ?? ln.oldNo ?? ""}
+          {lineNo ?? ""}
         </span>
         <span className="mono" style={lineSignFor(ln.kind)}>
           {sign}
@@ -62,6 +72,11 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
+        {/* Rendered as a direct sibling, not wrapped — an extra single-child
+           wrapper span would give an ancestor the same normalized textContent
+           as the badge itself, so text queries (getByText("Critical")) would
+           match both and double-count. */}
+        {marker && <SeverityBadge severity={marker} />}
       </div>
 
       {commenting &&

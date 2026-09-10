@@ -112,18 +112,23 @@ export class ReviewRunExecutor {
     // via `runLog.step`, which re-throws AND emits an `error` event that
     // would paint the Live Log red on a benign degradation) and logged as
     // `info`, matching the `callers digest: repoIntel failed — …` precedent
-    // below. `IntentService.deriveForRun` itself also never throws (R7); this
-    // try/catch is defense in depth, not the only guard.
+    // below. `IntentService.deriveForRun` itself also never throws (R7) — it
+    // returns `{ ok: false, reason }` instead of throwing, specifically so
+    // this catch block (defense in depth, not the only guard) still has a
+    // reason to log on the rare path where something upstream of it throws
+    // anyway.
     let intent: string | undefined;
     try {
       runLog.info('intent: deriving…');
       const derived = await new IntentService(this.container).deriveForRun(workspaceId, pull, repo);
-      if (derived) {
+      if (derived.ok) {
         intent = derived.intent;
         const { tokensIn, tokensOut, costUsd } = derived;
         const tokens = tokensIn != null && tokensOut != null ? ` — ${tokensIn}→${tokensOut} tok` : '';
         const cost = costUsd != null ? `, $${costUsd.toFixed(4)}` : '';
         runLog.info(`intent: ${derived.detail.confidence} confidence${tokens}${cost}`);
+      } else {
+        runLog.info(`intent: derivation failed — continuing without the Intent section (${derived.reason})`);
       }
     } catch (err) {
       runLog.info(`intent: derivation failed — continuing without the Intent section (${(err as Error).message})`);
@@ -177,6 +182,14 @@ export class ReviewRunExecutor {
     const runLog = parentLog.forRun(runId, { agent: agent.name });
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
+
+    // Running totals, accumulated via `onUsage` below as chunks complete (and
+    // on a chunk that throws after already consuming tokens) — so a failed
+    // run's `agent_runs` row records what was actually billed instead of the
+    // hard zeros a mid-run failure used to leave behind (R7).
+    let tokensInSoFar = 0;
+    let tokensOutSoFar = 0;
+    let costSoFar: number | null = 0;
 
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
@@ -251,6 +264,14 @@ export class ReviewRunExecutor {
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
         checkCancelled: () => {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
+        },
+        onUsage: (u) => {
+          tokensInSoFar += u.tokensIn;
+          tokensOutSoFar += u.tokensOut;
+          // Same null-poisoning rule the engine itself uses for costUsd
+          // (run.ts): once any chunk's cost is unknown, the running total is
+          // unknown rather than silently undercounting.
+          costSoFar = costSoFar == null || u.costUsd == null ? null : costSoFar + u.costUsd;
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
@@ -341,13 +362,23 @@ export class ReviewRunExecutor {
       const status = cancelled ? 'cancelled' : 'failed';
       const msg = cancelled ? 'Cancelled by user' : (err as Error).message;
       runLog.error(cancelled ? 'Run cancelled by user' : `Run failed: ${msg}`);
+      // Nothing was actually billed (no chunk completed or attached usage
+      // before the error) — costUsd is unknown/none, not a real $0.00, so it
+      // must render as "—" like every other free run, not $0.00.
+      const consumedAny = tokensInSoFar > 0 || tokensOutSoFar > 0;
+      if (consumedAny) {
+        runLog.info(
+          `Consumed ${tokensInSoFar}→${tokensOutSoFar} tok before ${cancelled ? 'cancellation' : 'failure'}` +
+            (costSoFar != null ? ` ($${costSoFar.toFixed(4)})` : ''),
+        );
+      }
       await this.repo
         .completeAgentRun(runId, {
           status,
           durationMs: Date.now() - start,
-          tokensIn: 0,
-          tokensOut: 0,
-          costUsd: null,
+          tokensIn: tokensInSoFar,
+          tokensOut: tokensOutSoFar,
+          costUsd: consumedAny ? costSoFar : null,
           findingsCount: 0,
           grounding: '0/0 passed',
           error: msg,

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "devdigest": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "devdigest-mcp/src/server.ts"],
+      "env": {
+        "DEVDIGEST_API_BASE": "http://localhost:3001",
+        "MCP_TOOL_TIMEOUT": "660000"
+      }
+    }
+  }
+}

@@ -47,9 +47,12 @@ export const PromptAssembly = z.object({
   repo_map: z.string().nullish(),
   /** PR author's description/body (truncated); null when absent. */
   pr_description: z.string().nullish(),
-  /** Derived PR intent section (L03), wrapped in `<untrusted>`; null when
-      absent or not yet derived. Nullish: traces written before this field
-      existed have no key at all, not a null. */
+  /** Derived PR intent text (L03), unwrapped and untruncated; null when
+      absent or not yet derived. The `## Intent` prompt section wraps this
+      with `<untrusted>` and truncates it at MAX_INTENT_SECTION_CHARS — this
+      field stores the raw value, same as `pr_description` above. Nullish:
+      traces written before this field existed have no key at all, not a
+      null. */
   intent: z.string().nullish(),
   user: z.string(),
 });

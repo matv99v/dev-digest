@@ -12,6 +12,8 @@ import {
   Button,
   EmptyState,
   ErrorState,
+  Icon,
+  type IconName,
   SectionLabel,
   Skeleton,
 } from "@devdigest/ui";
@@ -100,25 +102,23 @@ function IntentBody({
         </div>
       </div>
 
-      <p style={s.narrative}>{detail.intent}</p>
+      <p style={s.narrative}>&ldquo;{detail.intent}&rdquo;</p>
 
       <div style={s.listsRow}>
-        <div style={s.listCol}>
-          <div style={s.listLabel}>{t("inScope")}</div>
-          <ul style={s.list}>
-            {detail.in_scope.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
-        <div style={s.listCol}>
-          <div style={s.listLabel}>{t("outOfScope")}</div>
-          <ul style={s.list}>
-            {detail.out_of_scope.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
-        </div>
+        <ScopeList
+          label={t("inScope")}
+          icon="Check"
+          accent="var(--ok)"
+          itemColor="var(--text-secondary)"
+          items={detail.in_scope}
+        />
+        <ScopeList
+          label={t("outOfScope")}
+          icon="X"
+          accent="var(--text-muted)"
+          itemColor="var(--text-muted)"
+          items={detail.out_of_scope}
+        />
       </div>
 
       {detail.sources.length > 0 && (
@@ -135,6 +135,43 @@ function IntentBody({
         </div>
       )}
     </section>
+  );
+}
+
+/** One scope column: an icon+text header and a `·`-bulleted list. Out-of-scope
+    is rendered in the muted colour so the two columns read as "what this PR
+    does" vs "what it deliberately doesn't" at a glance, per the design mock. */
+function ScopeList({
+  label,
+  icon,
+  accent,
+  itemColor,
+  items,
+}: {
+  label: string;
+  icon: IconName;
+  accent: string;
+  itemColor: string;
+  items: string[];
+}) {
+  const I = Icon[icon];
+  return (
+    <div style={s.listCol}>
+      <div style={{ ...s.scopeLabel, color: accent }}>
+        <I size={13} aria-hidden />
+        <span>{label}</span>
+      </div>
+      <ul style={s.list}>
+        {items.map((item, i) => (
+          <li key={i} style={{ ...s.listItem, color: itemColor }}>
+            <span style={s.bullet} aria-hidden>
+              ·
+            </span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

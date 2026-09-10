@@ -26,6 +26,24 @@ _No entries yet._
 
 ## Codebase Patterns
 
+### 2026-09-07 — A running-total accumulator started at `0` can't tell "nothing happened yet" from "zero, confirmed"
+**Cause:** `run-executor.ts`'s failure path used to hard-code `costUsd: null` on every failed
+run. Replacing that with a running `costSoFar` accumulated via `reviewPullRequest`'s new
+`onUsage` sink (T6/T7, `docs/plans/05-long-run-llm-resilience.md`) initialized it at `0` to
+match the engine's own `run.ts` convention for a review that DOES complete a chunk. But a run
+that fails before any chunk ever reports usage (e.g. `MockLLMProvider` throws a plain `Error`
+with no `tokensIn`/`tokensOut` own properties) leaves `costSoFar` at its untouched initial `0`
+— which then persisted as a real `$0.00`, not "unknown/none" — and broke
+`test/reviews.it.test.ts`'s `"a failed run stores no cost (renders as '—', not $0.00)"`, which
+asserts `cost_usd` is `null`, not `0`, until the fix landed.
+**Rule:** when a failure-path accumulator's default doubles as "no usage happened," gate the
+persisted value on whether anything was actually accumulated (`tokensInSoFar > 0 ||
+tokensOutSoFar > 0`) rather than persisting the raw accumulator — `0` (a real free run) and
+"never touched" (no run occurred) are not the same fact even though they share a value.
+**Evidence:** `src/modules/reviews/run-executor.ts` `runOneAgent()`'s `catch` block (the
+`consumedAny` guard before `costUsd: consumedAny ? costSoFar : null`);
+`test/reviews.it.test.ts:275-298` (`a failed run stores no cost`).
+
 ### 2026-09-05 — A wire DTO built from a persisted row doesn't necessarily carry every column that row has
 **Cause:** `PrIntentDetail` (`vendor/shared/contracts/intent.ts`) extends `PrIntentRecord` with `confidence`/`sources`/`derived_from_sha`/`derived_at`/`model`/`provider`/`stale` but deliberately omits `tokens_in`/`tokens_out`/`cost_usd`, even though the persisted `pr_intent` row has all three — R11 keeps them off the wire and off `agent_runs` on purpose (one shared derive call has no correct per-run share of cost). Assuming the DTO mirrors the row 1:1 and reading `detail.tokensIn` off `IntentService.deriveForRun`'s return failed at `tsc`, not at review time.
 **Rule:** when a service method needs a persisted column that isn't on the corresponding wire contract, widen that method's own return type with the extra raw-row fields alongside the DTO — don't assume "the DTO has what the row has" and don't add the column to the contract just to unblock one internal caller.
@@ -93,6 +111,25 @@ nullish) vs `:110` (`cost_usd` on RunSummary, a column → nullable);
 `src/db/schema/runs.ts:50`.
 
 ## Tool & Library Notes
+
+### 2026-09-07 — editing any file `tsx watch` covers kills every in-flight review, and the corpse has no error text
+**Cause:** `pnpm dev` runs `tsx watch`, which watches the whole imported graph — including
+`reviewer-core`'s raw `.ts`, since the server imports it through a tsconfig alias with no build
+step. Saving a file there restarts the API process mid-run. Boot then calls
+`reapStaleRunningRuns` (`src/modules/reviews/repository/run.repo.ts:137`), which sets every
+`running` row to `failed` with a bare `.set({ status: 'failed' })` — no `error`, no
+`durationMs`. Two agent runs died that way while I edited a constant in
+`reviewer-core/src/review/run.ts`, and the resulting rows looked exactly like an LLM failure
+with a swallowed message. They were not: `run-executor.ts`'s own catch always writes both
+fields.
+**Rule:** an `agent_runs` row with `status='failed'` AND `error IS NULL` AND
+`duration_ms IS NULL` was reaped by a restart — do not debug it as a review failure, and check
+whether someone saved a file. When observing a live review, don't edit anything under
+`server/src/` or `reviewer-core/src/` until it finishes.
+**Evidence:** `src/modules/reviews/repository/run.repo.ts:137-143` (the reaper's `.set`);
+`src/app.ts:70-80` (awaited on boot, and its single-instance assumption);
+`src/modules/reviews/run-executor.ts` `runOneAgent()`'s catch (writes `durationMs` and `error`
+on a genuine failure).
 
 ### 2026-09-01 — `MockGitClient.readFile` never throws for a missing path; the real `SimpleGitClient` does
 **Cause:** `SimpleGitClient.readFile` (`src/adapters/git/simple-git.ts:129`) is a bare

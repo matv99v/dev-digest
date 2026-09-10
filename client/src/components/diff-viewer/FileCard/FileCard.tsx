@@ -5,9 +5,8 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Icon } from "@devdigest/ui";
-import type { PrFile } from "@/lib/types";
-import { AUTO_EXPAND_MAX_LINES } from "@/components/diff-viewer/constants";
-import { parsePatch, type Line } from "@/components/diff-viewer/helpers";
+import type { PrFile, Severity } from "@/lib/types";
+import { defaultOpenFor, parsePatch, type Line } from "@/components/diff-viewer/helpers";
 import {
   buildThreads,
   keysForLine,
@@ -30,11 +29,42 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+export function FileCard({
+  file,
+  commenting,
+  markers,
+  open: openProp,
+  onOpenChange,
+  headerRight,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  /** Smart order only: highest-severity non-dismissed finding per line
+     number, built once per file by the caller (SmartDiffViewer). Absent ⇒
+     no markers render, same as today. */
+  markers?: Map<number, Severity>;
+  /** Smart order only: makes open/closed a CONTROLLED value owned by the
+     caller, so a file can be expanded after mount without remounting it
+     (a remount would discard an in-progress inline-comment draft). Omit
+     both this and `onOpenChange` — as Original order does — and the card
+     keeps its own state, byte-for-byte unchanged (R9). */
+  open?: boolean;
+  /** Called with the next open state whenever the header is clicked. Fires
+     in both modes; only the controlled caller has to act on it. */
+  onOpenChange?: (open: boolean) => void;
+  /** Smart order only: extra content in the file header, right of the
+     comment count (e.g. the finding-count badge). */
+  headerRight?: React.ReactNode;
+}) {
   const t = useTranslations("shell");
-  const [open, setOpen] = React.useState(
-    (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
-  );
+  // Uncontrolled fallback: only consulted when the caller passes no `open`.
+  const [ownOpen, setOwnOpen] = React.useState(() => defaultOpenFor(file));
+  const open = openProp ?? ownOpen;
+  const toggle = () => {
+    const next = !open;
+    if (openProp === undefined) setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
 
   // Group this file's comments into threads, then split into ones we can anchor
@@ -54,7 +84,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
 
   return (
     <div style={s.fileCard}>
-      <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
+      <div onClick={toggle} style={s.fileHeader}>
         <Icon.ChevronRight size={13} style={chevronFor(open)} />
         <Icon.FileText size={14} style={s.fileIcon} />
         <span className="mono" style={s.filePath}>
@@ -72,6 +102,7 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
             {commentCount}
           </span>
         )}
+        {headerRight}
       </div>
       {open && (
         <div style={s.fileBody}>
@@ -85,6 +116,12 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                // Findings' start_line/end_line are new-file line numbers —
+                // a deleted line only has an oldNo and can never carry a
+                // marker (falling back to oldNo here would occasionally
+                // collide with an unrelated new-file line number sharing the
+                // same numeric value).
+                marker={ln.newNo != null ? markers?.get(ln.newNo) : undefined}
               />
             ))
           )}

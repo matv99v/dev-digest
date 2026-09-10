@@ -13,16 +13,28 @@ what already cost someone time there. Then check the rest of *Use when* for the 
 Say in one line what you took from them before you start. Don't rediscover from source
 what someone already wrote down.
 
+`INSIGHTS.md` is **append-only**: a wrong entry is never edited or deleted, only outranked
+by a newer one *above* it in the same section. Read the whole section before citing an
+entry — a Grep hit on a stale entry looks exactly like a live one.
+
 ## Repo shape
 
-Four standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`.
+Five standalone packages: `client/`, `server/`, `reviewer-core/`, `e2e/`, `devdigest-mcp/`.
 
 - **Not a workspace.** There is no root `package.json`; code is shared through tsconfig
   path aliases. Run every command from inside its own package directory.
 - **The package manager differs per package:**
   - pnpm — `server`, `client`
-  - npm — `reviewer-core`, `e2e`
+  - npm — `reviewer-core`, `e2e`, `devdigest-mcp`
   - Mixing them breaks `--frozen-lockfile` in CI.
+- `devdigest-mcp/` is the odd one out: it shares **no** source with anything. It talks to
+  the API over HTTP only, declares its own local response types, and must never gain a
+  `paths` alias into `@devdigest/shared` — it holds `zod@4` while `reviewer-core` holds
+  `zod@3`. **Registered automatically** by the committed root `.mcp.json` — opening Claude
+  Code at the repo root connects `devdigest` with no hand-wiring (`claude mcp list` shows
+  it). `scripts/dev.sh` / `scripts/e2e.sh` still never touch it — only the API it talks to.
+  See `devdigest-mcp/README.md` § *Registering with Claude Code*, or call one tool directly
+  with `npm run call` from inside the package without any MCP registration at all.
 - Prerequisites: Node ≥22, pnpm ≥10, Docker (Postgres only).
 - **Agent instructions live in `AGENTS.md`.** The `CLAUDE.md` next to it in every package
   is a committed symlink (`CLAUDE.md -> AGENTS.md`) so Claude Code loads the same file —

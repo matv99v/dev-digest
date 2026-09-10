@@ -40,6 +40,27 @@
     "reply": "Reply",
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
-    "outdatedTitle": "{count} comment(s) on older revisions"
+    "outdatedTitle": "{count} comment(s) on older revisions",
+    "smart": {
+      "toggleToSmart": "Smart order",
+      "toggleToOriginal": "Original order",
+      "filesCount": "{count} files",
+      "findingsBadgeLabel": "{count} finding(s) in {path}",
+      "unavailable": "Smart order isn't available until this PR's files have been fetched.",
+      "roles": {
+        "core": {
+          "title": "Core logic",
+          "desc": "The substance of the change — review closely"
+        },
+        "wiring": {
+          "title": "Wiring",
+          "desc": "Hooks the core into the app"
+        },
+        "boilerplate": {
+          "title": "Boilerplate",
+          "desc": "Generated / mechanical — skim"
+        }
+      }
+    }
   }
 }

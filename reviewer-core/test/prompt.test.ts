@@ -64,3 +64,47 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — ## Intent (L03)', () => {
+  it('renders the section (untrusted-wrapped) between PR description and Skills / rules, diff still last', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      prDescription: 'Adds rate limiting to the public /api endpoints.',
+      intent: 'Add rate limiting to prevent abuse of public endpoints.',
+      skills: ['Follow the security checklist.'],
+    });
+    const user = messages[1]!.content;
+    expect(user).toContain('## Intent');
+    expect(user).toContain('<untrusted source="intent">');
+    expect(user).toContain('Add rate limiting to prevent abuse of public endpoints.');
+    expect(user.indexOf('## PR description')).toBeLessThan(user.indexOf('## Intent'));
+    expect(user.indexOf('## Intent')).toBeLessThan(user.indexOf('## Skills / rules'));
+    expect(user.indexOf('## Skills / rules')).toBeLessThan(user.indexOf('## Diff to review'));
+    expect(assembly.intent).toBe('Add rate limiting to prevent abuse of public endpoints.');
+  });
+
+  it('omits the section when intent is undefined (no stray heading), and assembly.intent is null', () => {
+    const user = userOf({ system: 'sys', diff: 'DIFF' });
+    expect(user).not.toContain('## Intent');
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.intent).toBeNull();
+  });
+
+  it('truncates the ## Intent section content to the 2k cap in the prompt text (assembly.intent stays raw/untruncated)', () => {
+    const huge = 'x'.repeat(5_000);
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'D',
+      intent: huge,
+    });
+    const user = messages[1]!.content;
+    const startMarker = '<untrusted source="intent">\n';
+    const start = user.indexOf(startMarker) + startMarker.length;
+    const end = user.indexOf('\n</untrusted>', start);
+    const wrappedContent = user.slice(start, end);
+    expect(wrappedContent.length).toBe(2000);
+    // Deliberate: assembly.intent records the raw, untruncated value (unlike
+    // pr_description, which stores the already-truncated string) — see prompt.ts.
+    expect((assembly.intent as string).length).toBe(5000);
+  });
+});

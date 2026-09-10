@@ -110,7 +110,10 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await pg?.stop();
   });
 
-  function appWith(structured: unknown, provider: 'openai' | 'anthropic' = 'openai') {
+  function appWith(
+    structured: unknown,
+    provider: 'openai' | 'anthropic' | 'openrouter' = 'openai',
+  ) {
     return buildApp({
       config: config(),
       db: pg.handle.db,
@@ -311,6 +314,32 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     expect(reviews[0].findings).toHaveLength(1);
     expect(reviews[0].model).toBe('claude-x');
+    await app.close();
+  });
+
+  it('openrouter provider: an agent on the openrouter provider persists a review with findings', async () => {
+    const app = await appWith(REVIEW_FIXTURE, 'openrouter');
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: {
+          name: 'OpenRouter Rev',
+          provider: 'openrouter',
+          model: 'anthropic/claude-3.5-sonnet',
+          system_prompt: 'rev',
+        },
+      })
+    ).json();
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const reviews = (
+      await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })
+    ).json();
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0].findings).toHaveLength(1);
+    expect(reviews[0].model).toBe('anthropic/claude-3.5-sonnet');
     await app.close();
   });
 

@@ -13,11 +13,17 @@
  * raw-SQL probes below MUST swallow `undefined_table` (Postgres 42P01) so the
  * facade keeps returning degraded — never throws.
  */
-import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { clampIndexedName } from '../../db/schema/context.js';
-import type { DegradedReason, FileRankRow, IndexState, IndexStatus } from './types.js';
+import type {
+  DegradedReason,
+  FileRankRow,
+  IndexState,
+  IndexStatus,
+  ReverseDependentRow,
+} from './types.js';
 
 /** Chunk size for batched inserts — same value blast already uses. */
 const INSERT_CHUNK_SIZE = 500;
@@ -122,12 +128,21 @@ export interface FullSymbolRow {
   signature: string | null;
 }
 
-/** A resolved cross-file caller (reference whose decl_file is a changed file). */
+/**
+ * A resolved cross-file caller (reference whose decl_file is a changed file).
+ *
+ * `rn` is the row's rank within its own `to_symbol` partition (1-based).
+ * `getResolvedCallersRanked` fetches up to `perSymbolLimit + 1` rows per
+ * symbol precisely so a row with `rn === perSymbolLimit + 1` can serve as the
+ * exact "more callers existed" truncation signal — see `tryPersistentBlast`,
+ * which drops that extra row before anything downstream sees it.
+ */
 export interface ResolvedCallerRow {
   fromPath: string;
   toSymbol: string;
   line: number;
   rank: number;
+  rn: number;
 }
 
 export class RepoIntelRepository {
@@ -499,19 +514,47 @@ export class RepoIntelRepository {
       .where(and(eq(t.symbols.repoId, repoId), inArray(t.symbols.path, paths)));
   }
 
-  /** Resolved cross-file callers of symbols declared in `declFiles`. */
-  async getResolvedCallers(
+  /**
+   * Resolved cross-file callers of symbols declared in `declFiles`, ranked and
+   * capped PER SYMBOL — in SQL.
+   *
+   * Three things happen here that used to happen in JS, or not at all:
+   *   1. `ROW_NUMBER() OVER (PARTITION BY to_symbol …) <= perSymbolLimit` — the
+   *      cap is per changed symbol. Slicing the materialised set instead
+   *      truncates ACROSS symbols, so a second changed symbol can come back
+   *      with zero callers while the first one holds the whole budget.
+   *   2. The order is total: `rank DESC, from_path ASC, line ASC`. `rank` alone
+   *      ties constantly — `file_rank` is per file and a file usually holds
+   *      several callers — so two calls on unchanged data would otherwise
+   *      return different bodies.
+   *   3. `from_path <> decl_file` is in the predicate. It held before only
+   *      incidentally, because `resolveReferences` needs an import edge and a
+   *      file does not import itself; that is an accident of the resolver, not
+   *      a guarantee of this query.
+   *   4. The cap is `perSymbolLimit + 1`, not `perSymbolLimit`, and `rn` is
+   *      returned alongside every row. A post-dedup or post-cap count can't
+   *      tell "exactly the cap, no more" from "cut at the cap" — this fetches
+   *      one extra row per symbol so the caller (`tryPersistentBlast`) has an
+   *      exact signal (`rn === perSymbolLimit + 1`) instead of a heuristic,
+   *      then drops that extra row itself before anything else sees it.
+   */
+  async getResolvedCallersRanked(
     repoId: string,
     declFiles: string[],
     names: string[],
+    perSymbolLimit: number,
   ): Promise<ResolvedCallerRow[]> {
-    if (declFiles.length === 0 || names.length === 0) return [];
-    return this.db
+    if (declFiles.length === 0 || names.length === 0 || perSymbolLimit <= 0) return [];
+    const ranked = this.db
       .select({
         fromPath: t.references.fromPath,
         toSymbol: t.references.toSymbol,
         line: t.references.line,
         rank: t.fileRank.rank,
+        rn: sql<number>`row_number() over (
+          partition by ${t.references.toSymbol}
+          order by ${t.fileRank.rank} desc, ${t.references.fromPath} asc, ${t.references.line} asc
+        )`.as('rn'),
       })
       .from(t.references)
       .innerJoin(
@@ -526,8 +569,123 @@ export class RepoIntelRepository {
           eq(t.references.repoId, repoId),
           inArray(t.references.declFile, declFiles),
           inArray(t.references.toSymbol, names),
+          ne(t.references.fromPath, t.references.declFile),
         ),
-      );
+      )
+      .as('ranked');
+
+    return this.db
+      .select({
+        fromPath: ranked.fromPath,
+        toSymbol: ranked.toSymbol,
+        line: ranked.line,
+        rank: ranked.rank,
+        rn: ranked.rn,
+      })
+      .from(ranked)
+      .where(lte(ranked.rn, perSymbolLimit + 1))
+      .orderBy(desc(ranked.rank), asc(ranked.fromPath), asc(ranked.line), asc(ranked.toSymbol));
+  }
+
+  /**
+   * The reverse import walk: who imports these files, and who imports them.
+   *
+   * This is the FIRST backwards read of `file_edges`, and the reason
+   * `file_edges_repo_to_idx` on `(repo_id, to_file)` exists (see its docblock
+   * in `db/schema/repo-intel.ts`). Both levels join on `to_file`, so each is an
+   * index scan of O(degree). Writing it as `from_file = <changed>` compiles and
+   * returns rows — it just answers the opposite question.
+   *
+   * Invariants, all enforced in SQL rather than trimmed afterwards:
+   *   - a root is never its own dependent (`from_file <> root`, both levels);
+   *   - a file reached at depth 1 never reappears at depth 2 for that same root
+   *     (the `NOT EXISTS` against `d1`), so no dependent is counted twice;
+   *   - `file_facts` and `file_rank` are LEFT-joined. `file_facts` is sparse —
+   *     only files with ≥1 endpoint or cron get a row — so an inner join would
+   *     silently drop most dependents. A missing row means "no endpoints", and
+   *     "not indexed" is what the index status says, not this.
+   *
+   * The walk is hand-unrolled to two levels on purpose (no recursive CTE);
+   * `depth` is honoured for 1 and 2 and clamped to 2 above that.
+   */
+  async getReverseDependents(
+    repoId: string,
+    files: string[],
+    depth: number,
+    limitPerFile: number,
+  ): Promise<ReverseDependentRow[]> {
+    if (files.length === 0 || depth < 1 || limitPerFile <= 0) return [];
+    const roots = sql.join(
+      files.map((f) => sql`(${f}::text)`),
+      sql`, `,
+    );
+    const repo = sql`${repoId}::uuid`;
+    // Level 2 is dropped entirely (not filtered later) when depth === 1.
+    const level2 =
+      depth >= 2
+        ? sql`
+        union all
+        select root, file, 2 as depth, via from d2`
+        : sql``;
+
+    const rows = await this.db.execute<{
+      root: string;
+      file: string;
+      depth: number;
+      via: string;
+      endpoints: unknown;
+      crons: unknown;
+      rank: number;
+    }>(sql`
+      with roots(root) as (values ${roots}),
+      d1 as (
+        select distinct r.root as root, e.from_file as file
+        from roots r
+        join file_edges e on e.repo_id = ${repo} and e.to_file = r.root
+        where e.from_file <> r.root
+      ),
+      d2 as (
+        select d1.root as root, e.from_file as file, min(d1.file) as via
+        from d1
+        join file_edges e on e.repo_id = ${repo} and e.to_file = d1.file
+        where e.from_file <> d1.root
+          and not exists (
+            select 1 from d1 p where p.root = d1.root and p.file = e.from_file
+          )
+        group by d1.root, e.from_file
+      ),
+      walk as (
+        select root, file, 1 as depth, root as via from d1${level2}
+      ),
+      ranked as (
+        select
+          w.root, w.file, w.depth, w.via,
+          coalesce(ff.endpoints, '[]'::jsonb) as endpoints,
+          coalesce(ff.crons, '[]'::jsonb) as crons,
+          coalesce(fr.rank, 0) as rank,
+          row_number() over (
+            partition by w.root
+            order by w.depth asc, fr.rank desc nulls last, w.file asc
+          ) as rn
+        from walk w
+        left join file_facts ff on ff.repo_id = ${repo} and ff.file_path = w.file
+        left join file_rank fr on fr.repo_id = ${repo} and fr.file_path = w.file
+      )
+      select root, file, depth, via, endpoints, crons, rank
+      from ranked
+      where rn <= ${limitPerFile}
+      order by root asc, depth asc, rank desc, file asc
+    `);
+
+    return [...rows].map((r) => ({
+      root: r.root,
+      file: r.file,
+      depth: Number(r.depth),
+      via: r.via,
+      endpoints: Array.isArray(r.endpoints) ? (r.endpoints as string[]) : [],
+      crons: Array.isArray(r.crons) ? (r.crons as string[]) : [],
+      rank: Number(r.rank),
+    }));
   }
 
   /** Per-file facts (endpoints/crons) for the given files. */

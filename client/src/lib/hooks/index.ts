@@ -10,3 +10,4 @@ export * from "./skills";
 export * from "./conventions";
 export { useIntent, useDeriveIntent } from "./intent";
 export { useSmartDiff } from "./smart-diff";
+export { useBlast, useExplainBlast } from "./blast";

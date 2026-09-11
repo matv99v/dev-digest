@@ -11,6 +11,8 @@
  *  - contracts/conventions Convention, ConventionScan, ConventionSkillDraft (L02 extractor)
  *  - contracts/intent     IntentConfidence, IntentSourceKind, IntentSource,
  *                         PrIntentDetail (L03 PR intent layer)
+ *  - contracts/blast      BlastIndexState, BlastDependent, BlastReverseImpact,
+ *                         BlastExplanation, PrBlastRadius (L04 blast radius)
  *  - adapters             adapter interfaces + ModelInfo
  *
  * Feature agents (A1–A6) and F2 import everything from here. The barrel is
@@ -31,4 +33,5 @@ export * from './contracts/skills.js';
 export * from './contracts/agent-stats.js';
 export * from './contracts/conventions.js';
 export * from './contracts/intent.js';
+export * from './contracts/blast.js';
 export * from './adapters.js';

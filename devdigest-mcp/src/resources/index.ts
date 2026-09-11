@@ -13,7 +13,7 @@
  * Three of them:
  *   devdigest://score-rubric          what a 0–100 score means
  *   devdigest://severity-vocabulary   the severity and category enums
- *   devdigest://blast-radius          what the get_blast_radius stub is for
+ *   devdigest://blast-radius          get_blast_radius's shape and status vocabulary
  *
  * **No `cacheHint`.** The Phase-0 probe settled the negotiated era at legacy
  * `2025-11-25` (`README.md` § Protocol era), and `ttlMs` / `cacheScope` result
@@ -96,56 +96,81 @@ worth reading before merging.
 `;
 
 /**
- * The stub's explainer. Its job is to stop an empty result being read as a
- * clean bill of health — the one failure mode a stub that returns empty arrays
- * has. Every sentence here says *not implemented*, and none of them says
- * "no impact".
+ * `get_blast_radius`'s explainer. Its job is to stop a `degraded` or `none`
+ * result — or an empty `downstream`/`reverse` on a healthy one — being read as
+ * a clean bill of health. Every sentence names what `status` and `reason` mean
+ * instead of asserting an all-clear, and none of them says "no impact".
  */
-const BLAST_RADIUS = `# get_blast_radius — what it is, and what it is not yet
+const BLAST_RADIUS = `# get_blast_radius — what it returns, and how to read \`status\`
 
-## Not implemented
+## What it is
 
-\`get_blast_radius\` is registered but **not implemented**. It returns its wire
-shape with empty arrays and a summary saying so.
+\`get_blast_radius\` calls \`GET /pulls/:id/blast\` on the DevDigest API, which
+computes the map on read from the repository's persistent code index — the same
+symbols, callers and downstream impact the PR page's BLAST RADIUS card shows.
+Zero model calls: the map is pure code-index lookups, never an LLM's guess at
+what a change touches.
 
-An empty result from this tool means *the analysis did not run*. It does **not**
-mean the change is contained, and it is not evidence of anything about the code.
-Until this is implemented, establish impact by reading the diff and searching for
-callers directly.
+## Read \`status\` before the map
 
-## The shape it returns, today and later
+Every response carries a \`status\`, one of \`indexed\`, \`partial\`, \`degraded\` or
+\`none\`. Anything but \`indexed\` carries a \`reason\` naming why:
+
+- \`indexed\` — a full index. The map is as complete as the indexer gets.
+- \`partial\` — a working index, but ranking or facts may be incomplete.
+- \`degraded\` — running on a fallback path (for example the code-index flag is
+  off), or a lookup failed. Callers may all carry \`rank: 0\`.
+- \`none\` — the repository has never been indexed. \`changed_symbols\`,
+  \`downstream\` and \`reverse\` are empty, and there is nothing to explain.
+
+**An empty or degraded result means the analysis is incomplete, not that the
+change is safe.** \`downstream[].endpoints_affected\`, \`downstream[].crons_affected\`
+and every \`reverse[].dependents[].endpoints\`/\`.crons\` are *potentially* affected —
+found within two hops of the reverse import graph, never confirmed as reached.
+Absence from the list is not proof of absence of impact, on any status.
+
+## The shape it returns
 
 The payload matches the wire contract at
-\`server/src/vendor/shared/contracts/brief.ts\` (snake_case, not the camelCase
-internal facade):
+\`server/src/vendor/shared/contracts/blast.ts\` (\`PrBlastRadius\`, snake_case, not
+the camelCase internal facade):
 
 \`\`\`json
 {
-  "changed_symbols": ["<symbol>"],
+  "changed_symbols": [{ "name": "<symbol>", "file": "<path>", "kind": "<kind>" }],
   "downstream": [
     {
       "symbol": "<symbol>",
-      "callers": ["<file:line>"],
+      "callers": [{ "name": "<symbol>", "file": "<path>", "line": 1 }],
       "endpoints_affected": ["<method> <route>"],
       "crons_affected": ["<job name>"]
     }
   ],
-  "summary": "<prose>"
+  "summary": "<prose — the status word plus counts, never an all-clear>",
+  "status": "indexed | partial | degraded | none",
+  "reason": "<why, on every non-'indexed' status>",
+  "indexed_sha": "<the sha every caller file:line is pinned to>",
+  "callers_truncated": false,
+  "reverse": [
+    {
+      "changed_file": "<path>",
+      "dependents": [
+        { "file": "<path>", "depth": 1, "via": "<path>", "endpoints": [], "crons": [] }
+      ]
+    }
+  ],
+  "explanation": null
 }
 \`\`\`
 
-The stub returns \`changed_symbols: []\`, \`downstream: []\` and a \`summary\` that
-states it is not implemented. The shape is fixed now on purpose: when the real
-analysis lands it is a mapper plus a route on the API, not a contract change, so
-nothing that already calls this tool has to change with it.
+\`explanation\` is \`null\` until an Explain has been requested for this PR from the
+DevDigest UI — this tool never triggers one itself (\`GET /pulls/:id/blast\` never
+calls a model). When present it is a cached, one-paragraph model summary, not a
+second source of truth: it describes the same \`downstream\`/\`reverse\` data above.
 
-## What it will do once implemented
-
-Given a repo and a list of changed files, it will name the symbols those files
-export, then walk the repo's code index to report, for each one, the callers that
-reach it, the HTTP endpoints that depend on it, and the scheduled jobs that do.
-That index is served by the API's \`repo-intel\` module, which does not yet expose
-a route for this query.
+Callers' \`file:line\`s are pinned to \`indexed_sha\`, not the PR's head sha — the
+index can lag behind the head, and a link built from the head sha can land on a
+moved or deleted line.
 `;
 
 /**
@@ -185,9 +210,9 @@ export function registerResources(server: McpServer): void {
     'blast-radius',
     'devdigest://blast-radius',
     {
-      title: 'get_blast_radius — not implemented, and what it will return',
+      title: 'get_blast_radius — the impact map and how to read its status',
       description:
-        'Why get_blast_radius returns empty arrays today: the analysis is not implemented. Its wire shape, and what it will report once it is. An empty result is not a finding of no impact.',
+        'What get_blast_radius returns from GET /pulls/:id/blast: the wire shape, and how to read status (indexed/partial/degraded/none) and reason so a degraded or empty map is never mistaken for an all-clear.',
       mimeType: 'text/markdown',
     },
     (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: BLAST_RADIUS }] }),

@@ -34,7 +34,33 @@ export function MermaidDiagram({ chart }: { chart: string }) {
     (async () => {
       try {
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "strict" });
+        // `htmlLabels: false` at the ROOT (the per-diagram `flowchart.htmlLabels`
+        // is deprecated and emits FLOWCHART_HTML_LABELS_DEPRECATED): labels are
+        // then written into an SVG <text> via textContent, so diagram-supplied
+        // markup renders as literal characters and can never become an element.
+        // `secure` REPLACES mermaid's default list rather than extending it, so
+        // this must be the default six plus the theme keys. Dropping any of the
+        // defaults would re-open `maxTextSize`/`maxEdges` (the DoS guards) to a
+        // `%%{init:…}%%` directive in diagram source; the theme keys are added
+        // because the default list leaves `themeCSS`/`themeVariables` settable,
+        // which is the vector behind the 11.15.x themeCSS advisory.
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: "dark",
+          securityLevel: "strict",
+          htmlLabels: false,
+          secure: [
+            "secure",
+            "securityLevel",
+            "startOnLoad",
+            "maxTextSize",
+            "suppressErrorRendering",
+            "maxEdges",
+            "themeCSS",
+            "themeVariables",
+            "fontFamily",
+          ],
+        });
         // parse first; suppressErrors → returns false (no throw, no DOM bomb).
         const valid = await mermaid.parse(src, { suppressErrors: true });
         if (cancelled) return;

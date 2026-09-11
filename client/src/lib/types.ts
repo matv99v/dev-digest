@@ -39,6 +39,17 @@ export type {
   IntentSource,
   PrIntentDetail,
 } from "@devdigest/shared";
+export type {
+  BlastIndexState,
+  BlastDependent,
+  BlastReverseImpact,
+  BlastExplanation,
+  PrBlastRadius,
+  BlastRadius,
+  ChangedSymbol,
+  BlastCaller,
+  DownstreamImpact,
+} from "@devdigest/shared";
 
 /** UI-only view model for a PR list row (derives display fields from PrMeta). */
 export interface PrRowView {

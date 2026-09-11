@@ -26,8 +26,24 @@ export const EXCLUDED_DIRS = [
 ] as const;
 
 // --- Read-time limits -------------------------------------------------------
-/** [T1] Caller fan-out cap per changed symbol (ORDER BY rank DESC LIMIT N). */
+/**
+ * [T1] Caller fan-out cap per changed symbol. Enforced IN SQL by
+ * `getResolvedCallersRanked` — `ROW_NUMBER() OVER (PARTITION BY to_symbol
+ * ORDER BY rank DESC, …) <= N` — never by slicing the full set in JS, which
+ * would truncate across symbols and leave a second symbol with zero callers.
+ */
 export const MAX_CALLERS_PER_SYMBOL = 20;
+
+/**
+ * [L04] Depth of the reverse import walk (`who imports this file?`), served
+ * off `file_edges_repo_to_idx`. Two levels: direct importers and their
+ * importers. Deeper walks stop being "this change touches you" and start
+ * being "this repo has one graph".
+ */
+export const REVERSE_DEPTH = 2;
+
+/** [L04] Cap on reverse dependents returned per changed file (rank DESC). */
+export const MAX_DEPENDENTS_PER_FILE = 25;
 
 /**
  * [T1] Bumped whenever the AST extractor or symbol schema changes. A mismatch

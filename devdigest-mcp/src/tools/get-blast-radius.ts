@@ -1,116 +1,97 @@
 /**
- * `get_blast_radius` — an **honest stub** (R8).
+ * `get_blast_radius` — the impact map for a pull request's changed files.
  *
- * There is no `GET /pulls/:id/blast` route on the DevDigest API and no
- * blast-radius analysis behind it; `container.repoIntel.*` is server-side code
- * this package must never reach. The real tool is a later lesson: a route plus
- * a mapper from the camelCase facade `BlastResult`
- * (`server/src/modules/repo-intel/service.ts:220`) to the snake_case wire
- * contract this file already answers in. The stub exists so that work is a
- * mapper and a route rather than a contract change.
+ * The route it answers from, `GET /pulls/:id/blast`, computes the map on read
+ * from the persistent code index only (zero model calls on every path, R8) and
+ * is the **only** endpoint this tool reaches — it never reconstructs the map
+ * client-side. `resolvePr` turns the `pr` argument into the PR uuid the route
+ * needs.
  *
- * **The failure mode this file is written against is wording, not code.** A
- * tool that returns empty arrays reads to a model as *"analysed, found no
- * impact"* — a strictly false and actively harmful conclusion, because it is
- * indistinguishable from a real all-clear. So the `summary` says *not
- * implemented*, names the files it was asked about (proof it received them and
- * did nothing with them), and hands the caller a fallback it can actually
- * perform. The tool description says the same at its end. Neither ever says
- * "no impact".
+ * **The failure mode this tool is written against is wording, not code.** A
+ * degraded or unindexed map that reads to a model as *"analysed, found no
+ * impact"* is a strictly false and actively harmful conclusion, indistinguishable
+ * from a real all-clear. That is why `structuredContent` carries `status` and
+ * `reason` (R12) rather than only the map: a `degraded` or `none` status makes
+ * the missing analysis visible instead of silent, and every endpoint or cron in
+ * the result is *potentially* affected, never asserted as reached (R14). The
+ * server's own `summary` states the status in prose; this tool adds nothing on
+ * top of it and subtracts nothing from it.
  *
- * Errors are not caught here: `McpServer` turns a thrown `Error` into
- * `{ isError: true, content: [{ text: error.message }] }`, and both
- * `ResolveError.message` and `ApiError.message` are already written to be read
- * by the model. Catching them would only re-wrap text that is already right.
+ * Errors are caught here, the `get_conventions` / `get_findings` shape
+ * (`get-conventions.ts:156-163`, `get-findings.ts:85-90`), rather than left for
+ * `McpServer` to turn into the same `{ isError: true, ... }` shape on its own —
+ * this tool is no longer a stub with nothing else to do in its handler, and
+ * every other resolver-backed tool in this package already catches. Both
+ * `ResolveError.message` and `ApiError.message` are written to be read by a
+ * model, so the catch is a pass-through, not a rewrap.
  */
 import type { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 
-import { resolveRepo } from '../api/resolve';
+import { apiGet } from '../api/client';
+import { resolvePr } from '../api/resolve';
+import { log } from '../log';
 import { BlastRadiusWire } from '../types/blast';
 
 /**
  * Tool-search corpus. A model never searches for the string
- * `get_blast_radius` — it searches for what it wants to know, so the words
- * *impact*, *callers*, *downstream*, *affected files* and *symbols* lead. The
- * last sentence is what stops the model believing an empty result.
+ * `get_blast_radius` — it searches for what it wants to know, so *impact*,
+ * *callers*, *downstream*, *affected endpoints* and *changed symbols* lead.
+ * The closing sentence is what stops a `degraded` or `none` status being read
+ * as a clean bill of health.
  */
 const DESCRIPTION =
-  'Impact analysis for a code change: which callers, downstream symbols, HTTP endpoints and ' +
-  'cron jobs are affected by editing a given set of files in a repository, and which symbols ' +
-  'those files change. Use it to judge the blast radius of a pull request before reviewing it. ' +
-  'Accepts a repo uuid or `owner/repo`. Not yet implemented; returns an empty impact set — ' +
-  'that empty set means no analysis was run, not that the change is safe.';
+  'Impact analysis for a pull request: the symbols its changed files declare; for each, the ' +
+  'callers found in the repository\'s code index; and the HTTP endpoints and cron jobs within ' +
+  'two levels of the reverse import graph of the changed files, labelled potentially affected, ' +
+  'never asserted as reached. `status` (`indexed`, `partial`, `degraded`, `none`) says how much ' +
+  'the map can be trusted; anything but `indexed` carries a `reason`, and an empty or degraded ' +
+  'result means the analysis is incomplete, not that the change is safe. Accepts a PR uuid or ' +
+  '`owner/repo#N`. Use it to judge the blast radius of a pull request before reviewing it.';
 
-/** Enough files to prove the tool read the argument, not so many that a
- *  200-file call turns one stub answer into a wall of text. */
-function nameFiles(files: readonly string[]): string {
-  if (files.length === 0) return 'none were listed';
-  const shown = files.slice(0, 20).join(', ');
-  return files.length > 20 ? `${shown}, … (${files.length} total)` : shown;
-}
-
-/**
- * The `summary` an empty payload is carried by. Every clause is load-bearing:
- * what did not happen, what the empty arrays do *not* mean, which files were
- * asked about, and what to do instead.
- */
-export function stubSummary(files: readonly string[]): string {
-  return (
-    'Blast-radius analysis is not implemented in DevDigest yet, so nothing was analysed. ' +
-    'The empty `changed_symbols` and `downstream` arrays below are a placeholder, NOT a ' +
-    `finding — do not read them as an all-clear. Files this call asked about: ${nameFiles(files)}. ` +
-    'To judge the impact of these files, read the pull request diff directly and search the ' +
-    'repository for callers of the symbols it changes.'
-  );
-}
-
-/**
- * Registers the stub. `src/server.ts` (the composition root) calls this; no
- * tool file imports another tool file.
- */
 export function registerGetBlastRadius(server: McpServer): void {
   server.registerTool(
     'get_blast_radius',
     {
-      title: 'Blast radius of a change (stub)',
+      title: "Blast radius of a pull request's changes",
       description: DESCRIPTION,
       inputSchema: z.object({
-        repo: z
+        pr: z
           .string()
           .describe(
-            'Repository: a repo uuid, or `owner/repo` (for example `acme/web`), matched ' +
-              'case-insensitively against the repos imported into DevDigest.',
+            'The pull request: a DevDigest PR uuid, or the human form `owner/repo#N` (e.g. ' +
+              '`acme/web#42`). Resolving the human form calls the API\'s pulls route, which ' +
+              'syncs from GitHub and backfills up to 10 pull requests for that repo — pass a ' +
+              'uuid if you already have one and want no side effect.',
           ),
-        files: z
-          .array(z.string())
-          .describe('Repository-relative paths of the changed files, e.g. `src/api/client.ts`.'),
       }),
-      // Reads only; two calls with the same arguments give the same answer.
-      annotations: { readOnlyHint: true, idempotentHint: true },
+      // `readOnlyHint` describes this tool's own request against
+      // `GET /pulls/:id/blast` — a read that makes zero model calls (R8) and
+      // writes nothing. It does not cover `resolvePr`'s upstream sync; that
+      // effect is stated in the `pr` field's description above instead, the
+      // same split `get_findings` uses for the same resolver
+      // (`get-findings.ts:24-31,99`).
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     },
-    async ({ repo, files }) => {
-      // Resolved even though nothing downstream uses the id: a wrong repo ref
-      // must fail with `ResolveError`'s "here is what does exist" message
-      // rather than being silently answered by a stub. It also keeps the
-      // failure shape identical to the implemented tool's, so the later lesson
-      // changes what the tool computes and not how it rejects.
-      await resolveRepo(repo);
+    async ({ pr }) => {
+      try {
+        const prId = await resolvePr(pr);
+        const body = await apiGet<unknown>(`/pulls/${prId}/blast`);
 
-      const payload: BlastRadiusWire = {
-        changed_symbols: [],
-        downstream: [],
-        summary: stubSummary(files),
-      };
+        // Parsed against the wire contract on the way out, so a server field
+        // this schema has not been widened for fails loudly here instead of
+        // silently dropping out of `structuredContent`.
+        const structuredContent = BlastRadiusWire.parse(body);
 
-      // Parsed against the contract on the way out, so the stub can never drift
-      // from the shape the later lesson's mapper has to produce.
-      const structuredContent = BlastRadiusWire.parse(payload);
-
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(structuredContent, null, 2) }],
-        structuredContent,
-      };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      } catch (err) {
+        const text = err instanceof Error ? err.message : String(err);
+        log.error(`get_blast_radius failed: ${text}`);
+        return { isError: true, content: [{ type: 'text' as const, text }] };
+      }
     },
   );
 }

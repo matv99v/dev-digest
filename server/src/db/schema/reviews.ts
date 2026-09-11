@@ -77,6 +77,49 @@ export const prIntent = pgTable('pr_intent', {
   costUsd: doublePrecision('cost_usd'),
 });
 
+// ---- L04 Blast Radius — the Explain paragraph cache -----------------------
+// A satellite of `pull_requests`, the `pr_intent` shape exactly: `pr_id` is
+// both the primary key and a cascading FK, and it carries NO `workspace_id`
+// of its own — it is unreachable except through a parent row that already
+// carries one, and a duplicated column no constraint could keep in sync would
+// drift while giving a false sense of a DB-enforced tenancy boundary. The
+// boundary is enforced one layer up: every `pr_blast_summary` entry point
+// resolves `workspaceId` via `getContext`, then loads the parent PR through
+// the already-scoped `ReviewRepository.getPull(workspaceId, prId)`, throwing
+// `NotFoundError` before any statement here ever runs
+// (`modules/blast/service.ts`).
+//
+// Only the LLM paragraph is cached — the map itself (`changed_symbols` /
+// `downstream` / `reverse`) is five SQL reads on indexed columns and is
+// recomputed on every read (same posture as Smart Diff). This table exists
+// only because the paragraph costs a model call.
+//
+// TWO freshness shas, not one: `derivedFromSha` (the PR head this paragraph
+// described) and `derivedFromIndexSha` (the `repo_index_state.last_indexed_sha`
+// the underlying map was read at). A single sha would miss a reindex that
+// changes the map without moving the PR head, serving a paragraph describing
+// callers that no longer exist.
+//
+// NO INDEXES beyond the primary key. Every access path is `WHERE pr_id = $1`,
+// and `pr_id` is already a B-tree (the PK). Do not add a decorative one.
+export const prBlastSummary = pgTable('pr_blast_summary', {
+  prId: uuid('pr_id')
+    .primaryKey()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  explanation: text('explanation').notNull(),
+  derivedFromSha: text('derived_from_sha').notNull(),
+  derivedFromIndexSha: text('derived_from_index_sha').notNull(),
+  derivedAt: timestamp('derived_at', { withTimezone: true }).defaultNow().notNull(),
+  provider: text('provider'),
+  model: text('model'),
+  tokensIn: integer('tokens_in'),
+  tokensOut: integer('tokens_out'),
+  // Deliberate deviation from "money is NUMERIC": mirrors agent_runs.cost_usd
+  // and pr_intent.cost_usd — sub-cent price estimates, not ledger money.
+  // NULL ⇒ unpriced model ⇒ UI shows '—', never '$0.00'.
+  costUsd: doublePrecision('cost_usd'),
+});
+
 export const prBrief = pgTable('pr_brief', {
   prId: uuid('pr_id')
     .primaryKey()

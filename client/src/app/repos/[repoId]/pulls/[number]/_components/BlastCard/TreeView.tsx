@@ -159,22 +159,28 @@ function ReverseImpact({ data, repoFullName, sha }: ViewProps) {
           </div>
           <ul style={s.list}>
             {group.dependents.map((dep) => (
-              <li key={`${dep.file}:${dep.depth}`} style={s.listItem}>
-                <Icon.CornerDownRight size={12} aria-hidden />
-                <FileRef repoFullName={repoFullName} sha={sha} file={dep.file} />
-                <span style={s.symbolMeta}>
-                  {t("depth", { depth: dep.depth })} · {t("viaSymbol", { symbol: dep.via })}
-                </span>
-                {dep.endpoints.map((ep) => (
-                  <Badge key={ep} mono icon="Globe">
-                    {ep}
-                  </Badge>
-                ))}
-                {dep.crons.map((cron) => (
-                  <Badge key={cron} mono icon="Clock">
-                    {cron}
-                  </Badge>
-                ))}
+              <li key={`${dep.file}:${dep.depth}`}>
+                <div style={s.listItem}>
+                  <Icon.CornerDownRight size={12} aria-hidden />
+                  <FileRef repoFullName={repoFullName} sha={sha} file={dep.file} />
+                  <span style={s.symbolMeta}>
+                    {t("depth", { depth: dep.depth })} · {t("viaSymbol", { symbol: dep.via })}
+                  </span>
+                </div>
+                {(dep.endpoints.length > 0 || dep.crons.length > 0) && (
+                  <div style={s.chipRow}>
+                    {dep.endpoints.map((ep) => (
+                      <Badge key={ep} mono icon="Globe">
+                        {ep}
+                      </Badge>
+                    ))}
+                    {dep.crons.map((cron) => (
+                      <Badge key={cron} mono icon="Clock">
+                        {cron}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

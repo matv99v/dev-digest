@@ -39,6 +39,7 @@ import type {
   RefRow,
   RepoIntel,
   RepoMapResult,
+  ReverseDependentRow,
   SignatureRow,
   SymbolRow,
 } from './types.js';
@@ -48,7 +49,9 @@ import {
   INDEX_JOB_KIND,
   INDEXER_VERSION,
   MAX_CALLERS_PER_SYMBOL,
+  MAX_DEPENDENTS_PER_FILE,
   REFRESH_JOB_KIND,
+  REVERSE_DEPTH,
   RESYNC_JOB_KIND,
   SUPPORTED_EXT,
 } from './constants.js';
@@ -221,14 +224,69 @@ export class RepoIntelService implements RepoIntel {
     // T3: serve from the persistent index when it's built. Falls through to the
     // ripgrep best-effort below when the flag is off / index is absent.
     if (this.container.config.repoIntelEnabled && changedFiles.length > 0) {
-      const persistent = await this.tryPersistentBlast(repoId, changedFiles);
-      if (persistent) return persistent;
+      try {
+        const persistent = await this.tryPersistentBlast(repoId, changedFiles);
+        if (persistent) return persistent;
+      } catch {
+        // A DB error must not escape a facade documented as never throwing.
+        // Fall THROUGH to the ripgrep path rather than short-circuiting to an
+        // empty result: a transient blip would otherwise become a permanent
+        // "nothing is affected" for this request, which reads as an all-clear.
+      }
     }
 
+    try {
+      return await this.ripgrepBlast(repoId, changedFiles);
+    } catch {
+      return {
+        changedSymbols: [],
+        callers: [],
+        impactedEndpoints: [],
+        truncatedSymbols: [],
+        status: 'degraded',
+        degraded: true,
+        reason: 'no_data',
+      };
+    }
+  }
+
+  /**
+   * Who imports these files, two levels of the import graph deep, with each
+   * dependent's precomputed endpoints/crons attached. Persistent index only —
+   * there is no ripgrep equivalent of an import graph, so this degrades to `[]`
+   * (the array-returning half of the degraded contract) rather than to a
+   * slower answer.
+   */
+  async getReverseDependents(
+    repoId: string,
+    files: string[],
+  ): Promise<ReverseDependentRow[]> {
+    if (!this.container.config.repoIntelEnabled) return [];
+    if (files.length === 0) return [];
+    try {
+      return await this.repo.getReverseDependents(
+        repoId,
+        files,
+        REVERSE_DEPTH,
+        MAX_DEPENDENTS_PER_FILE,
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * The best-effort path: ripgrep over the clone through `container.codeIndex`,
+   * with `rank: 0` on every caller because there is no persistent rank to read.
+   * Always `status: 'degraded'` — the answer is real, but it is not the index's.
+   */
+  private async ripgrepBlast(repoId: string, changedFiles: string[]): Promise<BlastResult> {
     const empty: BlastResult = {
       changedSymbols: [],
       callers: [],
       impactedEndpoints: [],
+      truncatedSymbols: [],
+      status: 'degraded',
       degraded: true,
       reason: 'no_data',
     };
@@ -298,6 +356,8 @@ export class RepoIntelService implements RepoIntel {
       changedSymbols,
       callers: callerRows,
       impactedEndpoints: [...endpoints],
+      truncatedSymbols: [], // ripgrep path is uncapped — never truncated
+      status: 'degraded',
       degraded: true,
       reason: 'no_data',
     };
@@ -335,11 +395,40 @@ export class RepoIntelService implements RepoIntel {
       nameSet.add(s.name);
     }
     if (nameSet.size === 0) {
-      return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
+      return {
+        changedSymbols,
+        callers: [],
+        impactedEndpoints: [],
+        truncatedSymbols: [],
+        status: state.status,
+        degraded: false,
+      };
     }
 
-    // Resolved cross-file callers.
-    const callerRows = await this.repo.getResolvedCallers(repoId, changedFiles, [...nameSet]);
+    // Resolved cross-file callers — ranked, capped PER SYMBOL and ordered in
+    // SQL (see getResolvedCallersRanked). Nothing is sorted or sliced here.
+    // The repository fetches one row PAST the cap per symbol (rn up to
+    // perSymbolLimit + 1) so truncation can be read off the raw rn rather
+    // than guessed from a post-dedup count — `tryPersistentBlast` dedupes by
+    // (fromPath, enclosingSymbol, toSymbol) below, which can drop a capped
+    // symbol's row count below the cap and make a count-based check lie.
+    const rawCallerRows = await this.repo.getResolvedCallersRanked(
+      repoId,
+      changedFiles,
+      [...nameSet],
+      MAX_CALLERS_PER_SYMBOL,
+    );
+    const truncatedSymbols = [
+      ...new Set(
+        rawCallerRows
+          .filter((r) => r.rn > MAX_CALLERS_PER_SYMBOL)
+          .map((r) => r.toSymbol),
+      ),
+    ];
+    // Drop the extra (rn = cap + 1) row now — no consumer below this line
+    // (dedup, enclosing-symbol lookup, endpoint attribution) may see a 21st
+    // caller for a capped symbol.
+    const callerRows = rawCallerRows.filter((r) => r.rn <= MAX_CALLERS_PER_SYMBOL);
     const callerFiles = [...new Set(callerRows.map((c) => c.fromPath))];
 
     // Enclosing caller symbol from the callers' persistent symbol rows.
@@ -369,7 +458,6 @@ export class RepoIntelService implements RepoIntel {
         rank: c.rank,
       });
     }
-    callers.sort((a, b) => b.rank - a.rank);
 
     // Precomputed facts per caller file (endpoints + crons), so consumers can
     // attribute them to the changed symbol whose callers live in that file.
@@ -383,9 +471,14 @@ export class RepoIntelService implements RepoIntel {
 
     return {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      callers,
       impactedEndpoints: [...endpoints],
       factsByFile,
+      truncatedSymbols,
+      // The index's own word for itself: 'full' or 'partial' (the only two the
+      // guard above lets through). Consumers map it; they must not re-derive it
+      // from `degraded`, which is false for a working-but-`partial` index.
+      status: state.status,
       degraded: false,
     };
   }

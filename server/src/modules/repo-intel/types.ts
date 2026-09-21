@@ -72,6 +72,15 @@ export interface BlastCallerRow {
 }
 
 export interface BlastResult {
+  /**
+   * How the result was produced, as a fact about the index — NOT a UI word.
+   * `full`/`partial` = served from the persistent index (the `repo_index_state`
+   * row's own status); `degraded` = the ripgrep best-effort path, or no data at
+   * all. Required on purpose: every producer must state it, and consumers map
+   * it to their own vocabulary rather than inferring it from `degraded`, which
+   * is `false` for a working-but-`partial` index.
+   */
+  status: IndexStatus;
   changedSymbols: BlastChangedSymbol[];
   callers: BlastCallerRow[];
   /** "METHOD /path" (via extractEndpoints / file_facts) — flat union. */
@@ -82,8 +91,37 @@ export interface BlastResult {
    * Present on the persistent (non-degraded) path; absent otherwise.
    */
   factsByFile?: Record<string, { endpoints: string[]; crons: string[] }>;
+  /**
+   * Names of changed symbols whose caller list was cut at the cap
+   * (MAX_CALLERS_PER_SYMBOL). Required, not optional — `[]` when nothing was
+   * truncated, and always `[]` on the ripgrep path (uncapped). Decided from
+   * the raw pre-dedup rows, not a post-dedup count, which a capped-then-
+   * collapsed symbol would pass through as "not truncated".
+   */
+  truncatedSymbols: string[];
   degraded?: boolean;
   reason?: DegradedReason;
+}
+
+/**
+ * One file that transitively imports a changed file, found by walking
+ * `file_edges` BACKWARDS (`to_file` → `from_file`) from that changed file.
+ *
+ * `root` is the changed file the walk started at; `depth` is 1 (a direct
+ * importer) or 2 (an importer of a depth-1 file). `via` is the file it was
+ * reached through — the root itself at depth 1, the depth-1 file at depth 2.
+ * `endpoints`/`crons` come from the SPARSE `file_facts` table via a LEFT JOIN:
+ * empty means "declares no route", never "not indexed".
+ */
+export interface ReverseDependentRow {
+  root: string;
+  file: string;
+  depth: number;
+  via: string;
+  endpoints: string[];
+  crons: string[];
+  /** `file_rank.rank` of the dependent file; 0 when it has no rank row. */
+  rank: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +183,13 @@ export interface RepoIntel {
 
   // --- Reads --------------------------------------------------------------
   getBlastRadius(repoId: string, changedFiles: string[]): Promise<BlastResult>;
+  /**
+   * Who imports these files, within REVERSE_DEPTH levels of the import graph,
+   * with each dependent's precomputed endpoints/crons attached. Persistent
+   * index only: `[]` when the flag is off, the graph is absent, or the read
+   * fails — never a throw, per the degraded contract above.
+   */
+  getReverseDependents(repoId: string, files: string[]): Promise<ReverseDependentRow[]>;
   getRepoMap(repoId: string, tokenBudget?: number): Promise<RepoMapResult>;
   getFileRank(repoId: string, paths: string[]): Promise<FileRankRow[]>;
   getSymbolsInFiles(repoId: string, paths: string[]): Promise<SymbolRow[]>;

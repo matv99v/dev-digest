@@ -92,6 +92,25 @@ this copy (it is do-not-touch per `AGENTS.md`).
 
 ## Tool & Library Notes
 
+### 2026-09-10 — mermaid's docs contradict its own source on interaction and label safety, and `secure` replaces the default list instead of extending it
+**Cause:** two wrong beliefs, both taken from the official docs. (1) `click <id> href "<url>"` is
+documented as *"disabled when using `securityLevel='strict'`"*. It is not — `flowDb.ts` gates only
+`setClickFun` on `securityLevel !== 'loose'`; `setLink` has no gate, and the renderer inserts
+`<svg:a xlink:href>` regardless. `strict` is in fact the **safer** choice, because it runs the href
+through `@braintree/sanitize-url` (neutralising `javascript:`/`data:`) which `loose` skips. The
+config schema's *"HTML tags in the text are encoded"* is wrong too: `strict` DOMPurifies labels, so
+`<b>`/`<img>` survive as elements. Believing the docs nearly cost this feature its Graph view,
+rejected as "mermaid nodes can't be clickable". (2) `secure` was then set to a five-key list, which
+**replaced** mermaid's default six and silently re-opened `startOnLoad`, `maxTextSize`,
+`suppressErrorRendering` and `maxEdges` — the DoS guards — to a `%%{init:…}%%` directive.
+**Rule:** never take mermaid's configuration semantics from its docs; read the installed package.
+For untrusted labels the working combination is root-level `htmlLabels: false` (the label goes into
+an SVG `<text>` via `textContent`, so markup can never become an element) plus the default
+`securityLevel: 'strict'` — links keep working. Treat `secure` as a **replacement** list: it must
+carry mermaid's own defaults, read out of `node_modules`, plus whatever you add.
+**Evidence:** `client/src/components/mermaid-diagram/MermaidDiagram.tsx:37-63`; the defaults at
+`node_modules/mermaid/dist/chunks/mermaid.core/chunk-I66GZJ75.mjs`.
+
 ### 2026-09-01 — Hand-counting `../` for a `vi.mock` relative path is easy to get wrong, and the failure is silent
 **Cause:** `vi.mock` factories can't use the `@/` alias, so every test mocks its module by a
 relative path counted up from the test file's own directory. Counting the segments by eye

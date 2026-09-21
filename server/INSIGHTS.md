@@ -26,6 +26,20 @@ _No entries yet._
 
 ## Codebase Patterns
 
+### 2026-09-10 — `pnpm typecheck` does not cover `server/test/**`, so making a field required never names its test mocks
+**Cause:** `server/tsconfig.json`'s `include` is `["src/**/*.ts"]`, and vitest transpiles without
+typechecking — so a type error that exists only under `server/test/` is invisible to both. The L04
+blast work made `BlastResult.status` required *specifically* so `tsc` would list every producer, and
+its plan said so in as many words. It didn't: the one producer outside the module is an object
+literal typed `RepoIntel` inside another feature's integration test, which nothing checks. That mock
+kept passing while lying about the contract, and was found by grep.
+**Rule:** when you make a field required in order to flush out its producers, `grep server/test/`
+for the type or the method yourself — the compiler's list stops at `src/`. This cuts both ways:
+a test mock that has drifted from a `src/` type will never fail `pnpm typecheck` **or** vitest, so
+it is not evidence that the contract still holds.
+**Evidence:** `server/tsconfig.json:28`; the mock at `server/test/conventions.it.test.ts:48`;
+`server/src/modules/repo-intel/types.ts` (`BlastResult`).
+
 ### 2026-09-07 — A running-total accumulator started at `0` can't tell "nothing happened yet" from "zero, confirmed"
 **Cause:** `run-executor.ts`'s failure path used to hard-code `costUsd: null` on every failed
 run. Replacing that with a running `costSoFar` accumulated via `reviewPullRequest`'s new

@@ -21,9 +21,12 @@ import { toJsonSchema, parseWithRepair } from './structured.js';
  * parse-with-repair loop live in ONE place instead of being duplicated.
  *
  * OpenRouter is OpenAI-compatible, so we drive it with the OpenAI SDK pointed at
- * its baseURL. Only completeStructured is needed by reviewPullRequest; the rest
- * are stubs. Cost attribution is INJECTED (`estimateCost`) so the engine stays
- * free of a pricing table — the server passes its own, the runner passes none.
+ * its baseURL. `completeStructured` is what reviewPullRequest needs; `complete`
+ * is implemented too since other server callers (e.g. Blast's Explain) resolve
+ * an `LLMProvider` generically and expect the full interface. Only `embed` stays
+ * a stub — OpenRouter has no unified embeddings endpoint. Cost attribution is
+ * INJECTED (`estimateCost`) so the engine stays free of a pricing table — the
+ * server passes its own, the runner passes none.
  *
  * `req.timeoutMs` is enforced with a per-attempt `AbortController` passed to the
  * SDK's `RequestOptions.signal` — NOT a `Promise.race`, which would lose the
@@ -32,7 +35,7 @@ import { toJsonSchema, parseWithRepair } from './structured.js';
  * which is what stops an idle intermediary from reaping a long generation.
  */
 
-const NOT_SUPPORTED = 'OpenRouterProvider only implements completeStructured';
+const EMBED_NOT_SUPPORTED = 'OpenRouterProvider does not implement embed (no OpenRouter-wide embeddings API)';
 
 /**
  * Local error carrying whatever usage `completeStructured` had accumulated
@@ -273,10 +276,76 @@ export class OpenRouterProvider implements LLMProvider {
       (a, b) => (a.pricing?.completionPerM ?? Infinity) - (b.pricing?.completionPerM ?? Infinity),
     );
   }
-  async complete(_req: CompletionRequest): Promise<CompletionResult> {
-    throw new Error(NOT_SUPPORTED);
+  /**
+   * Free-text completion — same streaming transport and catch-based SSE-error
+   * guard as `completeStructured` (see that method's comments), minus the
+   * json_schema response_format and the parse-with-repair retry loop, since
+   * there's no schema to validate against here.
+   */
+  async complete(req: CompletionRequest): Promise<CompletionResult> {
+    const body: ChatCompletionCreateParamsStreaming = {
+      model: req.model,
+      messages: req.messages,
+      temperature: req.temperature ?? 0,
+      stream: true,
+      stream_options: { include_usage: true },
+      ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
+      ...(this.id === 'openrouter' ? { usage: { include: true } } : {}),
+    };
+
+    const controller = req.timeoutMs != null ? new AbortController() : undefined;
+    const timer =
+      controller && req.timeoutMs != null
+        ? setTimeout(() => controller.abort(), req.timeoutMs)
+        : undefined;
+
+    let content = '';
+    let sawChoice = false;
+    let errMsg: string | undefined;
+    let usage: ChatCompletionChunk['usage'] = null;
+
+    try {
+      const stream = await this.client.chat.completions.create(
+        body,
+        controller ? { signal: controller.signal } : undefined,
+      );
+      for await (const chunk of stream) {
+        const chunkErr = (chunk as unknown as { error?: { message?: string } }).error?.message;
+        if (chunkErr) errMsg = chunkErr;
+        if (chunk.choices && chunk.choices.length > 0) {
+          sawChoice = true;
+          const delta = chunk.choices[0]?.delta;
+          if (delta?.content) content += delta.content;
+        }
+        if (chunk.usage) usage = chunk.usage;
+      }
+    } catch (err) {
+      if (controller?.signal.aborted) {
+        throw new Error(`OpenRouter request for ${req.model} exceeded ${req.timeoutMs}ms`);
+      }
+      // See the SSE-error-payload note on `completeStructured`: the SDK throws
+      // synchronously on an `{"error":...}` chunk instead of yielding it.
+      errMsg = err instanceof Error ? err.message : String(err);
+      throw new Error(`OpenRouter returned no choices for ${req.model}: ${errMsg}`);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    if (!sawChoice) {
+      throw new Error(`OpenRouter returned no choices for ${req.model}${errMsg ? `: ${errMsg}` : ''}`);
+    }
+
+    const tokensIn = usage?.prompt_tokens ?? 0;
+    const tokensOut = usage?.completion_tokens ?? 0;
+    // `usage.cost` is an OpenRouter extension (USD), absent from the OpenAI SDK type.
+    const apiCost = (usage as { cost?: number } | null | undefined)?.cost;
+    const costUsd =
+      typeof apiCost === 'number' ? apiCost : (this.estimateCost?.(req.model, tokensIn, tokensOut) ?? null);
+
+    return { text: content, model: req.model, tokensIn, tokensOut, costUsd };
   }
+
   async embed(_texts: string[]): Promise<number[][]> {
-    throw new Error(NOT_SUPPORTED);
+    throw new Error(EMBED_NOT_SUPPORTED);
   }
 }
